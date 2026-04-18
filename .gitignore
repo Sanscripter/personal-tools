@@ -1,0 +1,24 @@
+# Windows system files
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Editor and IDE settings
+.vscode/
+.vs/
+.idea/
+
+# Logs and temp files
+*.log
+*.tmp
+*.temp
+*.bak
+*.orig
+*.stackdump
+
+# Environment-specific files
+.env
+.env.*
+
+# PowerShell and shell history
+*.ps1xml

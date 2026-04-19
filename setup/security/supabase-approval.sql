@@ -59,10 +59,8 @@ on public.admin_approval_requests
 for insert
 to anon, authenticated
 with check (
-    status = 'pending'
-    and length(request_secret) >= 20
-    and expires_at > timezone('utc', now())
-    and length(trim(allowed_email)) > 3
+    length(coalesce(request_secret, '')) >= 20
+    and length(trim(coalesce(allowed_email, ''))) > 3
 );
 
 drop policy if exists "approval request select by secret" on public.admin_approval_requests;

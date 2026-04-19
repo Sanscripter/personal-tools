@@ -251,6 +251,7 @@ function Request-PrivilegedApproval {
         requester_host   = $env:COMPUTERNAME
         requester_user   = [Environment]::UserName
         allowed_email    = $normalizedApprover
+        status           = 'pending'
         expires_at       = $expiresAt
     }
 

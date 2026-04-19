@@ -218,6 +218,13 @@
       element.classList.toggle('hidden', !isVisible)
     }
 
+    function getAuthRedirectUrl() {
+      const url = new URL(window.location.href)
+      url.hash = ''
+      url.search = ''
+      return url.toString()
+    }
+
     function setAuthMode(mode) {
       const isSignUp = mode === 'signup'
       show(signInForm, !isSignUp)
@@ -374,13 +381,19 @@
           throw new Error('The new passwords do not match.')
         }
 
-        const { error } = await supabase.auth.signUp({ email, password })
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: getAuthRedirectUrl(),
+          },
+        })
         if (error) throw error
 
         document.getElementById('signInEmail').value = email
         document.getElementById('signInPassword').value = password
         setAuthMode('signin')
-        setStatus('Account created. If email confirmation is enabled, confirm it first, then sign in.', 'ok')
+        setStatus('Account created. You can usually sign in now; if email confirmation is on, the link will return here instead of localhost.', 'ok')
       } catch (error) {
         setStatus(error.message || String(error), 'danger-text')
       }

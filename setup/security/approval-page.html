@@ -46,6 +46,7 @@
       background: #09111d;
       color: var(--text);
       padding: 10px 12px;
+      margin-bottom: 10px;
     }
     .row { display: flex; gap: 10px; flex-wrap: wrap; }
     .row > * { flex: 1 1 220px; }
@@ -102,19 +103,21 @@
     <div class="card" id="authCard">
       <h2>Sign in</h2>
       <p>Use your Supabase approver account, then satisfy MFA if asked.</p>
-      <div class="row">
-        <div>
-          <label for="email">Email</label>
-          <input id="email" type="email" autocomplete="username" />
+      <form id="authForm" autocomplete="on">
+        <div class="row">
+          <div>
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" autocomplete="email username" autocapitalize="none" spellcheck="false" />
+          </div>
+          <div>
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" />
+          </div>
         </div>
-        <div>
-          <label for="password">Password</label>
-          <input id="password" type="password" autocomplete="current-password" />
-        </div>
-      </div>
-      <button id="signInBtn">Sign in</button>
-      <button id="signUpBtn" class="secondary">Create account</button>
-      <button id="signOutBtn" class="secondary hidden">Sign out</button>
+        <button id="signInBtn" type="submit">Sign in</button>
+        <button id="signUpBtn" type="button" class="secondary">Create account</button>
+        <button id="signOutBtn" type="button" class="secondary hidden">Sign out</button>
+      </form>
     </div>
 
     <div class="card hidden" id="enrollCard">
@@ -428,7 +431,10 @@
       }
     }
 
-    document.getElementById('signInBtn').addEventListener('click', signIn)
+    document.getElementById('authForm').addEventListener('submit', (event) => {
+      event.preventDefault()
+      signIn()
+    })
     document.getElementById('signUpBtn').addEventListener('click', signUp)
     document.getElementById('signOutBtn').addEventListener('click', signOut)
     document.getElementById('startEnrollBtn').addEventListener('click', startEnroll)

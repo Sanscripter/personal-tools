@@ -105,15 +105,15 @@
       <h2 id="authTitle">Sign in</h2>
       <p id="authIntro">Use your Supabase approver account, then satisfy MFA if asked.</p>
 
-      <form id="signInForm" autocomplete="on">
+      <form id="signInForm" method="post" action="#" autocomplete="on">
         <div class="row">
           <div>
             <label for="signInEmail">Email</label>
-            <input id="signInEmail" name="username" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" />
+            <input id="signInEmail" name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" required />
           </div>
           <div>
             <label for="signInPassword">Password</label>
-            <input id="signInPassword" name="current-password" type="password" autocomplete="current-password" />
+            <input id="signInPassword" name="password" type="password" autocomplete="current-password" required />
           </div>
         </div>
         <div class="auth-actions">
@@ -123,19 +123,19 @@
         </div>
       </form>
 
-      <form id="signUpForm" class="hidden" autocomplete="on">
+      <form id="signUpForm" class="hidden" method="post" action="#" autocomplete="on">
         <div class="row">
           <div>
             <label for="signUpEmail">Email</label>
-            <input id="signUpEmail" name="username" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" />
+            <input id="signUpEmail" name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" required />
           </div>
           <div>
-            <label for="signUpPassword">New password</label>
-            <input id="signUpPassword" name="new-password" type="password" autocomplete="new-password" minlength="12" />
+            <label for="signUpPassword">Create password</label>
+            <input id="signUpPassword" name="password" type="password" autocomplete="new-password" minlength="12" required />
           </div>
         </div>
         <label for="signUpPasswordConfirm">Confirm password</label>
-        <input id="signUpPasswordConfirm" name="confirm-password" type="password" autocomplete="new-password" minlength="12" />
+        <input id="signUpPasswordConfirm" name="password_confirm" type="password" autocomplete="new-password" minlength="12" required />
         <div class="auth-actions">
           <button id="createAccountBtn" type="submit">Create account</button>
           <button id="cancelSignUpBtn" type="button" class="secondary">Back to sign in</button>
@@ -224,12 +224,12 @@
       show(signUpForm, isSignUp)
       document.getElementById('authTitle').textContent = isSignUp ? 'Create account' : 'Sign in'
       document.getElementById('authIntro').textContent = isSignUp
-        ? 'Create the approver account once. Chrome should now offer to generate and save a strong password.'
+        ? 'Create the approver account once. Chrome should offer to generate and save a strong password in the Create password field.'
         : 'Use your Supabase approver account, then satisfy MFA if asked.'
 
       if (isSignUp) {
         document.getElementById('signUpEmail').value = document.getElementById('signInEmail').value.trim()
-        document.getElementById('signUpPassword').focus()
+        window.setTimeout(() => document.getElementById('signUpPassword').focus(), 0)
       }
     }
 

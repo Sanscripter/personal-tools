@@ -46,10 +46,11 @@
       background: #09111d;
       color: var(--text);
       padding: 10px 12px;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
     .row { display: flex; gap: 10px; flex-wrap: wrap; }
     .row > * { flex: 1 1 220px; }
+    .auth-actions { margin-top: 4px; }
     button {
       border: 0;
       border-radius: 10px;
@@ -101,22 +102,44 @@
     </div>
 
     <div class="card" id="authCard">
-      <h2>Sign in</h2>
-      <p>Use your Supabase approver account, then satisfy MFA if asked.</p>
-      <form id="authForm" autocomplete="on">
+      <h2 id="authTitle">Sign in</h2>
+      <p id="authIntro">Use your Supabase approver account, then satisfy MFA if asked.</p>
+
+      <form id="signInForm" autocomplete="on">
         <div class="row">
           <div>
-            <label for="email">Email</label>
-            <input id="email" name="email" type="email" autocomplete="email username" autocapitalize="none" spellcheck="false" />
+            <label for="signInEmail">Email</label>
+            <input id="signInEmail" name="username" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" />
           </div>
           <div>
-            <label for="password">Password</label>
-            <input id="password" name="password" type="password" autocomplete="current-password" />
+            <label for="signInPassword">Password</label>
+            <input id="signInPassword" name="current-password" type="password" autocomplete="current-password" />
           </div>
         </div>
-        <button id="signInBtn" type="submit">Sign in</button>
-        <button id="signUpBtn" type="button" class="secondary">Create account</button>
-        <button id="signOutBtn" type="button" class="secondary hidden">Sign out</button>
+        <div class="auth-actions">
+          <button id="signInBtn" type="submit">Sign in</button>
+          <button id="showSignUpBtn" type="button" class="secondary">Create account</button>
+          <button id="signOutBtn" type="button" class="secondary hidden">Sign out</button>
+        </div>
+      </form>
+
+      <form id="signUpForm" class="hidden" autocomplete="on">
+        <div class="row">
+          <div>
+            <label for="signUpEmail">Email</label>
+            <input id="signUpEmail" name="username" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" />
+          </div>
+          <div>
+            <label for="signUpPassword">New password</label>
+            <input id="signUpPassword" name="new-password" type="password" autocomplete="new-password" minlength="12" />
+          </div>
+        </div>
+        <label for="signUpPasswordConfirm">Confirm password</label>
+        <input id="signUpPasswordConfirm" name="confirm-password" type="password" autocomplete="new-password" minlength="12" />
+        <div class="auth-actions">
+          <button id="createAccountBtn" type="submit">Create account</button>
+          <button id="cancelSignUpBtn" type="button" class="secondary">Back to sign in</button>
+        </div>
       </form>
     </div>
 
@@ -168,6 +191,8 @@
     const mfaCard = document.getElementById('mfaCard')
     const approveCard = document.getElementById('approveCard')
     const approveSummary = document.getElementById('approveSummary')
+    const signInForm = document.getElementById('signInForm')
+    const signUpForm = document.getElementById('signUpForm')
     const signOutBtn = document.getElementById('signOutBtn')
     const showSecretBtn = document.getElementById('showSecretBtn')
     const secretTextEl = document.getElementById('secretText')
@@ -191,6 +216,21 @@
 
     function show(element, isVisible) {
       element.classList.toggle('hidden', !isVisible)
+    }
+
+    function setAuthMode(mode) {
+      const isSignUp = mode === 'signup'
+      show(signInForm, !isSignUp)
+      show(signUpForm, isSignUp)
+      document.getElementById('authTitle').textContent = isSignUp ? 'Create account' : 'Sign in'
+      document.getElementById('authIntro').textContent = isSignUp
+        ? 'Create the approver account once. Chrome should now offer to generate and save a strong password.'
+        : 'Use your Supabase approver account, then satisfy MFA if asked.'
+
+      if (isSignUp) {
+        document.getElementById('signUpEmail').value = document.getElementById('signInEmail').value.trim()
+        document.getElementById('signUpPassword').focus()
+      }
     }
 
     function ensureClient() {
@@ -313,8 +353,8 @@
     async function signIn() {
       try {
         const supabase = ensureClient()
-        const email = document.getElementById('email').value.trim()
-        const password = document.getElementById('password').value
+        const email = document.getElementById('signInEmail').value.trim()
+        const password = document.getElementById('signInPassword').value
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
         await updateUiState()
@@ -326,10 +366,20 @@
     async function signUp() {
       try {
         const supabase = ensureClient()
-        const email = document.getElementById('email').value.trim()
-        const password = document.getElementById('password').value
+        const email = document.getElementById('signUpEmail').value.trim()
+        const password = document.getElementById('signUpPassword').value
+        const confirmPassword = document.getElementById('signUpPasswordConfirm').value
+
+        if (password !== confirmPassword) {
+          throw new Error('The new passwords do not match.')
+        }
+
         const { error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
+
+        document.getElementById('signInEmail').value = email
+        document.getElementById('signInPassword').value = password
+        setAuthMode('signin')
         setStatus('Account created. If email confirmation is enabled, confirm it first, then sign in.', 'ok')
       } catch (error) {
         setStatus(error.message || String(error), 'danger-text')
@@ -431,11 +481,16 @@
       }
     }
 
-    document.getElementById('authForm').addEventListener('submit', (event) => {
+    signInForm.addEventListener('submit', (event) => {
       event.preventDefault()
       signIn()
     })
-    document.getElementById('signUpBtn').addEventListener('click', signUp)
+    signUpForm.addEventListener('submit', (event) => {
+      event.preventDefault()
+      signUp()
+    })
+    document.getElementById('showSignUpBtn').addEventListener('click', () => setAuthMode('signup'))
+    document.getElementById('cancelSignUpBtn').addEventListener('click', () => setAuthMode('signin'))
     document.getElementById('signOutBtn').addEventListener('click', signOut)
     document.getElementById('startEnrollBtn').addEventListener('click', startEnroll)
     showSecretBtn.addEventListener('click', () => {

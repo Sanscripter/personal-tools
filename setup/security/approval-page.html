@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b1220" />
   <title>Privileged Approval</title>
+  <link rel="manifest" href="manifest.webmanifest" />
   <style>
     :root {
       color-scheme: dark;
@@ -70,6 +72,15 @@
       box-shadow: 0 16px 48px rgba(0,0,0,.35);
     }
     .modal-actions { margin-top: 12px; }
+    .quick-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .quick-actions button { flex: 1 1 180px; }
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .modal-head button { margin-top: 0; }
     button {
       border: 0;
       border-radius: 10px;
@@ -120,10 +131,22 @@
       <div id="requestDetails" class="mono">Waiting for request details…</div>
     </div>
 
-    <div class="card" id="authCard">
-      <h2 id="authTitle">Sign in</h2>
-      <p id="authIntro">Use your Supabase approver account, then satisfy MFA if asked.</p>
+    <div class="card">
+      <h2>Quick actions</h2>
+      <p>Use popups instead of scrolling through the whole page.</p>
+      <div class="quick-actions">
+        <button id="openAuthBtn" type="button">Account</button>
+        <button id="openPhoneBtn" type="button" class="secondary">Phone app</button>
+      </div>
+    </div>
 
+    <div class="modal hidden" id="authCard" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+      <div class="modal-panel">
+        <div class="modal-head">
+          <h2 id="authTitle">Sign in</h2>
+          <button id="closeAuthBtn" type="button" class="secondary">Close</button>
+        </div>
+        <p id="authIntro">Use your Supabase approver account, then satisfy MFA if asked.</p>
       <form id="signInForm" method="post" action="#" autocomplete="on">
         <div class="row">
           <div>
@@ -160,10 +183,15 @@
           <button id="cancelSignUpBtn" type="button" class="secondary">Back to sign in</button>
         </div>
       </form>
+      </div>
     </div>
 
-    <div class="card hidden" id="enrollCard">
-      <h2>MFA enrollment</h2>
+    <div class="modal hidden" id="enrollCard" role="dialog" aria-modal="true" aria-labelledby="enrollTitle">
+      <div class="modal-panel">
+      <div class="modal-head">
+        <h2 id="enrollTitle">MFA enrollment</h2>
+        <button id="closeEnrollBtn" type="button" class="secondary">Close</button>
+      </div>
       <p>No MFA factor is enrolled yet. Enroll your phone once for approval.</p>
       <p class="hint">Do not copy the TOTP seed to laptops or desktops. It belongs in your authenticator app only.</p>
       <button id="startEnrollBtn">Start TOTP enrollment</button>
@@ -177,21 +205,47 @@
         <input id="enrollCode" type="text" inputmode="numeric" maxlength="6" />
         <button id="finishEnrollBtn">Verify and enable</button>
       </div>
+      </div>
     </div>
 
-    <div class="card hidden" id="mfaCard">
-      <h2>MFA check</h2>
+    <div class="modal hidden" id="mfaCard" role="dialog" aria-modal="true" aria-labelledby="mfaTitle">
+      <div class="modal-panel">
+      <div class="modal-head">
+        <h2 id="mfaTitle">MFA check</h2>
+        <button id="closeMfaBtn" type="button" class="secondary">Close</button>
+      </div>
       <p>Enter the current code from your authenticator app to raise this session to AAL2.</p>
       <label for="mfaCode">Authenticator code</label>
       <input id="mfaCode" type="text" inputmode="numeric" maxlength="6" />
       <button id="verifyMfaBtn">Verify MFA</button>
+      </div>
     </div>
 
-    <div class="card hidden" id="approveCard">
-      <h2>Approve or deny</h2>
+    <div class="modal hidden" id="approveCard" role="dialog" aria-modal="true" aria-labelledby="approveTitle">
+      <div class="modal-panel">
+      <div class="modal-head">
+        <h2 id="approveTitle">Approve or deny</h2>
+        <button id="closeApproveBtn" type="button" class="secondary">Close</button>
+      </div>
       <p id="approveSummary">This session is ready to decide the request.</p>
       <button id="approveBtn">Approve</button>
       <button id="denyBtn" class="danger">Deny</button>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="phoneModal" role="dialog" aria-modal="true" aria-labelledby="phoneTitle">
+      <div class="modal-panel">
+        <div class="modal-head">
+          <h3 id="phoneTitle">Phone app</h3>
+          <button id="closePhoneBtn" type="button" class="secondary">Close</button>
+        </div>
+        <p>Install this app on Android and enable notifications so new approval requests can jump straight to your phone.</p>
+        <div id="phoneStatus" class="mono">Checking phone app status…</div>
+        <div class="modal-actions">
+          <button id="installAppBtn" type="button">Install app</button>
+          <button id="enablePushBtn" type="button" class="secondary">Enable phone alerts</button>
+        </div>
+      </div>
     </div>
 
     <div class="modal hidden" id="decisionModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
@@ -212,6 +266,7 @@
     const params = new URLSearchParams(window.location.search)
     const fallbackSupabaseUrl = 'https://lxhyauenhihtqzurzbjz.supabase.co'
     const fallbackAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4aHlhdWVuaGlodHF6dXJ6Ymp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1Mjk0ODEsImV4cCI6MjA5MjEwNTQ4MX0.1GloludOPQfbwusGYLsdRSw6vbWXihitOK9Jlhy8FSY'
+    const vapidPublicKey = 'BDZ065iE_mpsUaO3ePpIpx4JcihbikFnGBNZDjmTLc_1aDaLenjl_q4P3Itr0Jong2i-TUOif40IrkeklycOgwk'
     const storedSupabaseUrl = (() => {
       try { return window.localStorage.getItem('approvalSupabaseUrl') || '' } catch { return '' }
     })()
@@ -241,8 +296,13 @@
     const modalMessage = document.getElementById('modalMessage')
     const modalStatus = document.getElementById('modalStatus')
     const modalConfirmBtn = document.getElementById('modalConfirmBtn')
+    const phoneStatusEl = document.getElementById('phoneStatus')
+    const installAppBtn = document.getElementById('installAppBtn')
+    const enablePushBtn = document.getElementById('enablePushBtn')
 
     let supabaseClient = null
+    let swRegistration = null
+    let deferredInstallPrompt = null
     let currentRequest = null
     let currentFactorId = null
     let enrollFactorId = null
@@ -256,6 +316,18 @@
     function setModalStatus(message, tone) {
       modalStatus.textContent = message || ''
       modalStatus.className = 'mono ' + (tone || '')
+    }
+
+    function setPhoneStatus(message, tone) {
+      phoneStatusEl.textContent = message || ''
+      phoneStatusEl.className = 'mono ' + (tone || '')
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - base64String.length % 4) % 4)
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+      const rawData = atob(base64)
+      return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)))
     }
 
     function formatAuthError(error) {
@@ -296,6 +368,59 @@
       pendingDecision = null
       modalConfirmBtn.disabled = false
       show(decisionModal, false)
+    }
+
+    async function registerPhoneApp() {
+      if (!('serviceWorker' in navigator)) {
+        setPhoneStatus('This browser does not support service workers.', 'warn')
+        return
+      }
+
+      swRegistration = await navigator.serviceWorker.register('approval-sw.js')
+      setPhoneStatus('Phone app ready. You can install it and enable alerts.', 'ok')
+    }
+
+    async function promptInstall() {
+      if (!deferredInstallPrompt) {
+        setPhoneStatus('Install is available from Chrome menu if the browser does not prompt automatically.', 'warn')
+        return
+      }
+
+      deferredInstallPrompt.prompt()
+      const choice = await deferredInstallPrompt.userChoice
+      deferredInstallPrompt = null
+      setPhoneStatus(choice.outcome === 'accepted' ? 'App install started.' : 'App install dismissed.', choice.outcome === 'accepted' ? 'ok' : 'warn')
+    }
+
+    async function enablePhoneNotifications() {
+      try {
+        if (!swRegistration || !('PushManager' in window)) {
+          throw new Error('Push notifications are not available in this browser.')
+        }
+
+        const permission = await Notification.requestPermission()
+        if (permission !== 'granted') {
+          throw new Error('Notification permission was not granted.')
+        }
+
+        const subscription = await swRegistration.pushManager.getSubscription() || await swRegistration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        })
+
+        const supabase = ensureClient()
+        const { error } = await supabase.functions.invoke('approval-notify', {
+          body: {
+            action: 'subscribe',
+            subscription: subscription.toJSON(),
+          },
+        })
+
+        if (error) throw error
+        setPhoneStatus('Phone alerts are enabled. New approval requests can now ping this device.', 'ok')
+      } catch (error) {
+        setPhoneStatus(formatAuthError(error), 'danger-text')
+      }
     }
 
     function getAuthRedirectUrl() {
@@ -422,12 +547,15 @@
 
         if (!user) {
           setStatus('Sign in to continue.', 'warn')
+          show(authCard, true)
           show(enrollCard, false)
           show(mfaCard, false)
           show(approveCard, false)
           closeDecisionModal()
           return
         }
+
+        show(authCard, false)
 
         const factorsResponse = await supabase.auth.mfa.listFactors()
         if (factorsResponse.error) throw factorsResponse.error
@@ -540,7 +668,7 @@
         const supabase = ensureClient()
         const { data, error } = await supabase.auth.mfa.enroll({
           factorType: 'totp',
-          friendlyName: 'personal-tools admin',
+          friendlyName: 'Morgan Toolbox admin',
         })
         if (error) throw error
 
@@ -651,7 +779,16 @@
     document.getElementById('showSignUpBtn').addEventListener('click', () => setAuthMode('signup'))
     document.getElementById('cancelSignUpBtn').addEventListener('click', () => setAuthMode('signin'))
     document.getElementById('signOutBtn').addEventListener('click', signOut)
+    document.getElementById('openAuthBtn').addEventListener('click', () => show(authCard, true))
+    document.getElementById('closeAuthBtn').addEventListener('click', () => show(authCard, false))
+    document.getElementById('openPhoneBtn').addEventListener('click', () => show(document.getElementById('phoneModal'), true))
+    document.getElementById('closePhoneBtn').addEventListener('click', () => show(document.getElementById('phoneModal'), false))
+    document.getElementById('closeEnrollBtn').addEventListener('click', () => show(enrollCard, false))
+    document.getElementById('closeMfaBtn').addEventListener('click', () => show(mfaCard, false))
+    document.getElementById('closeApproveBtn').addEventListener('click', () => show(approveCard, false))
     document.getElementById('modalCancelBtn').addEventListener('click', closeDecisionModal)
+    installAppBtn.addEventListener('click', promptInstall)
+    enablePushBtn.addEventListener('click', enablePhoneNotifications)
     document.getElementById('startEnrollBtn').addEventListener('click', startEnroll)
     showSecretBtn.addEventListener('click', () => {
       secretTextEl.classList.toggle('hidden')
@@ -669,7 +806,14 @@
 
     async function init() {
       try {
+        window.addEventListener('beforeinstallprompt', (event) => {
+          event.preventDefault()
+          deferredInstallPrompt = event
+          setPhoneStatus('This app can now be installed on your phone.', 'ok')
+        })
+
         ensureClient()
+        await registerPhoneApp()
         await restoreSessionFromUrlTokens()
         await updateUiState()
       } catch (error) {

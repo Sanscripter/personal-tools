@@ -90,4 +90,4 @@ with check (
     and approved_by_email = public.current_approval_email()
 );
 
-comment on table public.admin_approval_requests is 'One-time elevated command approvals for the personal-tools repo.';
+comment on table public.admin_approval_requests is 'One-time elevated command approvals for the Morgan Toolbox repo.';

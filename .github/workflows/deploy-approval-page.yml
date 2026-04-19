@@ -8,6 +8,10 @@ on:
     paths:
       - .github/workflows/deploy-approval-page.yml
       - setup/security/approval-page.html
+      - setup/security/approval-qr.html
+      - setup/security/approval-sw.js
+      - setup/security/manifest.webmanifest
+      - setup/security/approval-icon.svg
 
 permissions:
   contents: read
@@ -38,6 +42,9 @@ jobs:
           New-Item -ItemType Directory -Force -Path public | Out-Null
           Copy-Item 'setup/security/approval-page.html' 'public/index.html' -Force
           Copy-Item 'setup/security/approval-qr.html' 'public/approval-qr.html' -Force
+          Copy-Item 'setup/security/approval-sw.js' 'public/approval-sw.js' -Force
+          Copy-Item 'setup/security/manifest.webmanifest' 'public/manifest.webmanifest' -Force
+          Copy-Item 'setup/security/approval-icon.svg' 'public/approval-icon.svg' -Force
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

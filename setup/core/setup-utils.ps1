@@ -215,10 +215,39 @@ function Invoke-ApprovalApiRequest {
     return Invoke-RestMethod @invokeParams
 }
 
+function Invoke-ApprovalNotification {
+    param(
+        [Parameter(Mandatory = $true)][string]$SupabaseUrl,
+        [Parameter(Mandatory = $true)][string]$AnonKey,
+        [Parameter(Mandatory = $true)][string]$RequestId,
+        [Parameter(Mandatory = $true)][string]$RequestSecret,
+        [Parameter(Mandatory = $true)][string]$ApprovalUrl,
+        [Parameter(Mandatory = $true)][string]$Action
+    )
+
+    $headers = @{
+        apikey        = $AnonKey
+        Authorization = "Bearer $AnonKey"
+        Accept        = 'application/json'
+        'Content-Type' = 'application/json'
+    }
+
+    $body = @{
+        action        = 'notify'
+        requestId     = $RequestId
+        requestSecret = $RequestSecret
+        approvalUrl   = $ApprovalUrl
+        approvalAction = $Action
+    } | ConvertTo-Json -Depth 10 -Compress
+
+    $uri = ($SupabaseUrl.TrimEnd('/') + '/functions/v1/approval-notify')
+    return Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -Body $body -ErrorAction Stop
+}
+
 function Request-PrivilegedApproval {
     param(
         [Parameter(Mandatory = $true)][string]$Action,
-        [string]$Reason = 'Administrator privileges are being requested from the personal-tools repo.',
+        [string]$Reason = 'Administrator privileges are being requested from the Morgan Toolbox repo.',
         [int]$TimeoutSec = 0
     )
 
@@ -292,6 +321,16 @@ function Request-PrivilegedApproval {
         page    = $approvalPageUrl
         action  = $Action
     })
+
+    try {
+        $notifyResult = Invoke-ApprovalNotification -SupabaseUrl $supabaseUrl -AnonKey $anonKey -RequestId $requestId -RequestSecret $requestSecret -ApprovalUrl $launchUrl -Action $Action
+        if ($notifyResult.ok -and [int]$notifyResult.sent -gt 0) {
+            Write-Host 'A phone alert was sent to your linked Android app.' -ForegroundColor Green
+        }
+    }
+    catch {
+        Write-Host 'No phone alert was sent yet. The QR page and copied link still work.' -ForegroundColor DarkYellow
+    }
 
     Write-Host ''
     Write-Host 'Approval request created.' -ForegroundColor Green

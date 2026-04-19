@@ -51,6 +51,25 @@
     .row { display: flex; gap: 10px; flex-wrap: wrap; }
     .row > * { flex: 1 1 220px; }
     .auth-actions { margin-top: 4px; }
+    .modal {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(3, 8, 18, 0.75);
+      z-index: 1000;
+    }
+    .modal-panel {
+      width: min(480px, 100%);
+      background: var(--panel);
+      border: 1px solid #24324d;
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 16px 48px rgba(0,0,0,.35);
+    }
+    .modal-actions { margin-top: 12px; }
     button {
       border: 0;
       border-radius: 10px;
@@ -174,15 +193,36 @@
       <button id="approveBtn">Approve</button>
       <button id="denyBtn" class="danger">Deny</button>
     </div>
+
+    <div class="modal hidden" id="decisionModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-panel">
+        <h3 id="modalTitle">Approve request</h3>
+        <p id="modalMessage">Confirm this action.</p>
+        <div id="modalStatus" class="mono"></div>
+        <div class="modal-actions">
+          <button id="modalConfirmBtn" type="button">Confirm</button>
+          <button id="modalCancelBtn" type="button" class="secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const params = new URLSearchParams(window.location.search)
+    const fallbackSupabaseUrl = 'https://lxhyauenhihtqzurzbjz.supabase.co'
+    const fallbackAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4aHlhdWVuaGlodHF6dXJ6Ymp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1Mjk0ODEsImV4cCI6MjA5MjEwNTQ4MX0.1GloludOPQfbwusGYLsdRSw6vbWXihitOK9Jlhy8FSY'
+    const storedSupabaseUrl = (() => {
+      try { return window.localStorage.getItem('approvalSupabaseUrl') || '' } catch { return '' }
+    })()
+    const storedAnonKey = (() => {
+      try { return window.localStorage.getItem('approvalAnonKey') || '' } catch { return '' }
+    })()
+
     const requestId = params.get('request') || ''
     const requestSecret = params.get('secret') || ''
-    const supabaseUrl = params.get('supabaseUrl') || ''
-    const anonKey = params.get('anonKey') || ''
+    const supabaseUrl = params.get('supabaseUrl') || storedSupabaseUrl || fallbackSupabaseUrl
+    const anonKey = params.get('anonKey') || storedAnonKey || fallbackAnonKey
 
     const statusEl = document.getElementById('status')
     const requestDetailsEl = document.getElementById('requestDetails')
@@ -196,15 +236,37 @@
     const signOutBtn = document.getElementById('signOutBtn')
     const showSecretBtn = document.getElementById('showSecretBtn')
     const secretTextEl = document.getElementById('secretText')
+    const decisionModal = document.getElementById('decisionModal')
+    const modalTitle = document.getElementById('modalTitle')
+    const modalMessage = document.getElementById('modalMessage')
+    const modalStatus = document.getElementById('modalStatus')
+    const modalConfirmBtn = document.getElementById('modalConfirmBtn')
 
     let supabaseClient = null
     let currentRequest = null
     let currentFactorId = null
     let enrollFactorId = null
+    let pendingDecision = null
 
     function setStatus(message, tone) {
       statusEl.textContent = message
       statusEl.className = 'mono ' + (tone || '')
+    }
+
+    function setModalStatus(message, tone) {
+      modalStatus.textContent = message || ''
+      modalStatus.className = 'mono ' + (tone || '')
+    }
+
+    function formatAuthError(error) {
+      const message = (error && error.message ? error.message : String(error || '')).trim()
+      if (/email.*confirm/i.test(message)) {
+        return 'Your email is not confirmed yet. Use the latest confirmation link and then return here.'
+      }
+      if (/invalid login credentials/i.test(message)) {
+        return 'That email or password was rejected. If you just created the account, try the Create account flow again.'
+      }
+      return message || 'The action could not be completed.'
     }
 
     function escapeHtml(value) {
@@ -218,11 +280,57 @@
       element.classList.toggle('hidden', !isVisible)
     }
 
+    function openDecisionModal(status) {
+      pendingDecision = status
+      modalTitle.textContent = status === 'approved' ? 'Approve request' : 'Deny request'
+      modalMessage.textContent = status === 'approved'
+        ? 'Approve this privileged action now?'
+        : 'Deny this privileged action now?'
+      modalConfirmBtn.textContent = status === 'approved' ? 'Approve now' : 'Deny now'
+      modalConfirmBtn.className = status === 'approved' ? '' : 'danger'
+      setModalStatus('')
+      show(decisionModal, true)
+    }
+
+    function closeDecisionModal() {
+      pendingDecision = null
+      modalConfirmBtn.disabled = false
+      show(decisionModal, false)
+    }
+
     function getAuthRedirectUrl() {
       const url = new URL(window.location.href)
       url.hash = ''
       url.search = ''
       return url.toString()
+    }
+
+    async function restoreSessionFromUrlTokens() {
+      const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : ''
+      if (!hash) {
+        return
+      }
+
+      const hashParams = new URLSearchParams(hash)
+      const accessToken = hashParams.get('access_token')
+      const refreshToken = hashParams.get('refresh_token')
+      if (!accessToken || !refreshToken) {
+        return
+      }
+
+      const supabase = ensureClient()
+      const { error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      })
+      if (error) {
+        throw error
+      }
+
+      const cleanUrl = new URL(window.location.href)
+      cleanUrl.hash = ''
+      window.history.replaceState({}, document.title, cleanUrl.toString())
+      setStatus('Email confirmation succeeded. Continue below.', 'ok')
     }
 
     function setAuthMode(mode) {
@@ -242,12 +350,18 @@
 
     function ensureClient() {
       if (!supabaseUrl || !anonKey) {
-        throw new Error('Missing Supabase URL or anon key in the approval URL.')
+        throw new Error('Missing Supabase URL or anon key for the approval app.')
       }
       if (!window.supabase || !window.supabase.createClient) {
         throw new Error('Supabase client library did not load.')
       }
       if (!supabaseClient) {
+        try {
+          window.localStorage.setItem('approvalSupabaseUrl', supabaseUrl)
+          window.localStorage.setItem('approvalAnonKey', anonKey)
+        } catch {
+        }
+
         supabaseClient = window.supabase.createClient(supabaseUrl, anonKey, {
           global: {
             headers: {
@@ -261,7 +375,9 @@
 
     async function loadRequest() {
       if (!requestId || !requestSecret) {
-        throw new Error('Missing request id or secret.')
+        currentRequest = null
+        requestDetailsEl.textContent = 'No active approval request is open yet. Sign in here, then return when a script asks for approval.'
+        return
       }
       const supabase = ensureClient()
       const { data, error } = await supabase
@@ -309,23 +425,7 @@
           show(enrollCard, false)
           show(mfaCard, false)
           show(approveCard, false)
-          return
-        }
-
-        setStatus('Signed in as ' + user.email, 'ok')
-
-        if (!currentRequest || currentRequest.status !== 'pending') {
-          show(enrollCard, false)
-          show(mfaCard, false)
-          show(approveCard, false)
-          return
-        }
-
-        if ((user.email || '').toLowerCase() !== (currentRequest.allowed_email || '').toLowerCase()) {
-          setStatus('This account is not the approved approver for this request.', 'danger-text')
-          show(enrollCard, false)
-          show(mfaCard, false)
-          show(approveCard, false)
+          closeDecisionModal()
           return
         }
 
@@ -334,13 +434,34 @@
         const totpFactors = (factorsResponse.data?.totp || []).filter((factor) => factor.status === 'verified')
 
         if (totpFactors.length === 0) {
+          setStatus('Signed in as ' + user.email + '. Enroll MFA to finish approval setup.', 'warn')
           show(enrollCard, true)
           show(mfaCard, false)
           show(approveCard, false)
+          closeDecisionModal()
           return
         }
 
         currentFactorId = totpFactors[0].id
+
+        if (!currentRequest || currentRequest.status !== 'pending') {
+          setStatus('Signed in as ' + user.email + '. Waiting for an approval request.', 'ok')
+          show(enrollCard, false)
+          show(mfaCard, false)
+          show(approveCard, false)
+          closeDecisionModal()
+          return
+        }
+
+        if ((user.email || '').toLowerCase() !== (currentRequest.allowed_email || '').toLowerCase()) {
+          setStatus('This account is not the approved approver for this request.', 'danger-text')
+          show(enrollCard, false)
+          show(mfaCard, false)
+          show(approveCard, false)
+          closeDecisionModal()
+          return
+        }
+
         const aal = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
         if (aal.error) throw aal.error
 
@@ -349,11 +470,15 @@
         show(mfaCard, needsMfa)
         show(approveCard, !needsMfa)
 
-        if (!needsMfa) {
+        if (needsMfa) {
+          setStatus('Enter the current authenticator code to continue.', 'warn')
+        }
+        else {
           approveSummary.textContent = 'Approve the request for ' + currentRequest.action + '.'
+          setStatus('Signed in as ' + user.email + '. Ready to decide this request.', 'ok')
         }
       } catch (error) {
-        setStatus(error.message || String(error), 'danger-text')
+        setStatus(formatAuthError(error), 'danger-text')
       }
     }
 
@@ -366,7 +491,7 @@
         if (error) throw error
         await updateUiState()
       } catch (error) {
-        setStatus(error.message || String(error), 'danger-text')
+        setStatus(formatAuthError(error), 'danger-text')
       }
     }
 
@@ -395,7 +520,7 @@
         setAuthMode('signin')
         setStatus('Account created. You can usually sign in now; if email confirmation is on, the link will return here instead of localhost.', 'ok')
       } catch (error) {
-        setStatus(error.message || String(error), 'danger-text')
+        setStatus(formatAuthError(error), 'danger-text')
       }
     }
 
@@ -475,6 +600,9 @@
 
     async function decide(status) {
       try {
+        modalConfirmBtn.disabled = true
+        setModalStatus('Submitting decision…', 'warn')
+
         const supabase = ensureClient()
         const user = await getTrustedUser()
         const { error } = await supabase
@@ -487,10 +615,14 @@
           .eq('status', 'pending')
 
         if (error) throw error
+        setModalStatus('Request ' + status + '.', status === 'approved' ? 'ok' : 'warn')
         setStatus('Request ' + status + '.', status === 'approved' ? 'ok' : 'warn')
         await updateUiState()
+        window.setTimeout(closeDecisionModal, 900)
       } catch (error) {
-        setStatus(error.message || String(error), 'danger-text')
+        const message = formatAuthError(error)
+        setModalStatus(message, 'danger-text')
+        setStatus(message, 'danger-text')
       }
     }
 
@@ -505,6 +637,7 @@
     document.getElementById('showSignUpBtn').addEventListener('click', () => setAuthMode('signup'))
     document.getElementById('cancelSignUpBtn').addEventListener('click', () => setAuthMode('signin'))
     document.getElementById('signOutBtn').addEventListener('click', signOut)
+    document.getElementById('modalCancelBtn').addEventListener('click', closeDecisionModal)
     document.getElementById('startEnrollBtn').addEventListener('click', startEnroll)
     showSecretBtn.addEventListener('click', () => {
       secretTextEl.classList.toggle('hidden')
@@ -512,11 +645,25 @@
     })
     document.getElementById('finishEnrollBtn').addEventListener('click', finishEnroll)
     document.getElementById('verifyMfaBtn').addEventListener('click', verifyMfa)
-    document.getElementById('approveBtn').addEventListener('click', () => decide('approved'))
-    document.getElementById('denyBtn').addEventListener('click', () => decide('denied'))
+    document.getElementById('approveBtn').addEventListener('click', () => openDecisionModal('approved'))
+    document.getElementById('denyBtn').addEventListener('click', () => openDecisionModal('denied'))
+    document.getElementById('modalConfirmBtn').addEventListener('click', () => {
+      if (pendingDecision) {
+        decide(pendingDecision)
+      }
+    })
 
-    ensureClient()
-    updateUiState()
+    async function init() {
+      try {
+        ensureClient()
+        await restoreSessionFromUrlTokens()
+        await updateUiState()
+      } catch (error) {
+        setStatus(formatAuthError(error), 'danger-text')
+      }
+    }
+
+    init()
   </script>
 </body>
 </html>

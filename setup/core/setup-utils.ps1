@@ -290,7 +290,7 @@ function Request-PrivilegedApproval {
 
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSec)
     while ([DateTime]::UtcNow -lt $deadline) {
-        Start-Sleep -Seconds 2
+        Start-Sleep -Seconds 1
 
         try {
             $requestIdFilter = [System.Uri]::EscapeDataString("eq.$requestId")
@@ -306,7 +306,7 @@ function Request-PrivilegedApproval {
 
             switch ([string]$requestState.status) {
                 'approved' {
-                    Write-Host 'Approval granted.' -ForegroundColor Green
+                    Write-Host 'Approval granted. Continuing the waiting command...' -ForegroundColor Green
                     return $true
                 }
                 'denied' {

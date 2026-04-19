@@ -284,7 +284,7 @@
       pendingDecision = status
       modalTitle.textContent = status === 'approved' ? 'Approve request' : 'Deny request'
       modalMessage.textContent = status === 'approved'
-        ? 'Approve this privileged action now?'
+        ? 'Approve this privileged action now? The waiting terminal should continue as soon as this is confirmed.'
         : 'Deny this privileged action now?'
       modalConfirmBtn.textContent = status === 'approved' ? 'Approve now' : 'Deny now'
       modalConfirmBtn.className = status === 'approved' ? '' : 'danger'
@@ -605,7 +605,7 @@
 
         const supabase = ensureClient()
         const user = await getTrustedUser()
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('admin_approval_requests')
           .update({
             status,
@@ -613,12 +613,26 @@
           })
           .eq('request_id', requestId)
           .eq('status', 'pending')
+          .select('request_id,status,approved_by_email')
+          .maybeSingle()
 
         if (error) throw error
-        setModalStatus('Request ' + status + '.', status === 'approved' ? 'ok' : 'warn')
-        setStatus('Request ' + status + '.', status === 'approved' ? 'ok' : 'warn')
+        if (!data || data.status !== status) {
+          throw new Error('The request was not updated. It may have expired, failed MFA, or already been handled.')
+        }
+
+        const successMessage = status === 'approved'
+          ? 'Request approved. The waiting terminal should continue within a second or two.'
+          : 'Request denied.'
+        setModalStatus(successMessage, status === 'approved' ? 'ok' : 'warn')
+        setStatus(successMessage, status === 'approved' ? 'ok' : 'warn')
         await updateUiState()
-        window.setTimeout(closeDecisionModal, 900)
+        window.setTimeout(() => {
+          closeDecisionModal()
+          if (status === 'approved') {
+            try { window.close() } catch {}
+          }
+        }, 1200)
       } catch (error) {
         const message = formatAuthError(error)
         setModalStatus(message, 'danger-text')

@@ -74,6 +74,29 @@
     .modal-actions { margin-top: 12px; }
     .quick-actions { display: flex; gap: 10px; flex-wrap: wrap; }
     .quick-actions button { flex: 1 1 180px; }
+    .install-hero {
+      border-color: #4669a8;
+      box-shadow: 0 0 0 1px rgba(110, 168, 254, 0.2), 0 16px 40px rgba(0,0,0,.25);
+    }
+    .install-chip {
+      display: inline-block;
+      margin-bottom: 10px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #203251;
+      color: var(--warn);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .install-steps {
+      margin: 10px 0 0 18px;
+      padding: 0;
+    }
+    .install-steps li {
+      margin-bottom: 6px;
+    }
     .modal-head {
       display: flex;
       align-items: center;
@@ -124,6 +147,17 @@
       <h1>Privileged command approval</h1>
       <p>This page is used by the local admin helpers to approve or deny elevated actions.</p>
       <div id="status" class="mono">Loading…</div>
+    </div>
+
+    <div class="card install-hero" id="installHero">
+      <div class="install-chip">Recommended on Android</div>
+      <h2>Install this on your phone</h2>
+      <p>Add it to your home screen once, then turn on phone alerts for faster approvals.</p>
+      <div class="quick-actions">
+        <button id="heroInstallBtn" type="button">Install on this phone</button>
+        <button id="heroPhoneBtn" type="button" class="secondary">Set up phone alerts</button>
+      </div>
+      <p id="installHint" class="hint">Best flow: sign in on Android, install the app, then enable alerts.</p>
     </div>
 
     <div class="card" id="requestCard">
@@ -239,11 +273,16 @@
           <h3 id="phoneTitle">Phone app</h3>
           <button id="closePhoneBtn" type="button" class="secondary">Close</button>
         </div>
-        <p>Install this app on Android and enable notifications so new approval requests can jump straight to your phone.</p>
+        <p><strong>Best on Android:</strong> install this page once and allow alerts so new approval requests can jump straight to your phone.</p>
+        <ol class="install-steps">
+          <li>Sign in on this phone</li>
+          <li>Tap <strong>Install on this phone</strong></li>
+          <li>Tap <strong>Turn on phone alerts</strong></li>
+        </ol>
         <div id="phoneStatus" class="mono">Checking phone app status…</div>
         <div class="modal-actions">
-          <button id="installAppBtn" type="button">Install app</button>
-          <button id="enablePushBtn" type="button" class="secondary">Enable phone alerts</button>
+          <button id="installAppBtn" type="button">Install on this phone</button>
+          <button id="enablePushBtn" type="button" class="secondary">Turn on phone alerts</button>
         </div>
       </div>
     </div>
@@ -299,6 +338,10 @@
     const phoneStatusEl = document.getElementById('phoneStatus')
     const installAppBtn = document.getElementById('installAppBtn')
     const enablePushBtn = document.getElementById('enablePushBtn')
+    const heroInstallBtn = document.getElementById('heroInstallBtn')
+    const heroPhoneBtn = document.getElementById('heroPhoneBtn')
+    const installHintEl = document.getElementById('installHint')
+    const phoneModal = document.getElementById('phoneModal')
 
     let supabaseClient = null
     let swRegistration = null
@@ -370,6 +413,31 @@
       show(decisionModal, false)
     }
 
+    function isStandaloneMode() {
+      return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
+    }
+
+    function updateInstallCta() {
+      if (isStandaloneMode()) {
+        installAppBtn.textContent = 'App already installed'
+        heroInstallBtn.textContent = 'App already installed'
+        installAppBtn.disabled = true
+        heroInstallBtn.disabled = true
+        installHintEl.textContent = 'Installed app detected on this phone. You can turn on alerts below.'
+        setPhoneStatus('This phone already has the app installed.', 'ok')
+        return
+      }
+
+      installAppBtn.disabled = false
+      heroInstallBtn.disabled = false
+      if (deferredInstallPrompt) {
+        installHintEl.textContent = 'Install prompt is ready. Tap the big button now.'
+        setPhoneStatus('Install prompt is ready on this phone.', 'ok')
+      } else {
+        installHintEl.textContent = 'If Chrome does not prompt automatically, use the browser menu and choose Add to Home screen.'
+      }
+    }
+
     async function registerPhoneApp() {
       if (!('serviceWorker' in navigator)) {
         setPhoneStatus('This browser does not support service workers.', 'warn')
@@ -377,19 +445,71 @@
       }
 
       swRegistration = await navigator.serviceWorker.register('approval-sw.js')
-      setPhoneStatus('Phone app ready. You can install it and enable alerts.', 'ok')
+      updateInstallCta()
+      if (!isStandaloneMode()) {
+        setPhoneStatus('Phone app ready. Install it and then turn on alerts.', 'ok')
+      }
     }
 
     async function promptInstall() {
+      if (isStandaloneMode()) {
+        updateInstallCta()
+        return
+      }
+
       if (!deferredInstallPrompt) {
-        setPhoneStatus('Install is available from Chrome menu if the browser does not prompt automatically.', 'warn')
+        setPhoneStatus('Open the Chrome menu on Android and choose Add to Home screen, then return here.', 'warn')
+        show(phoneModal, true)
         return
       }
 
       deferredInstallPrompt.prompt()
       const choice = await deferredInstallPrompt.userChoice
       deferredInstallPrompt = null
-      setPhoneStatus(choice.outcome === 'accepted' ? 'App install started.' : 'App install dismissed.', choice.outcome === 'accepted' ? 'ok' : 'warn')
+      setPhoneStatus(choice.outcome === 'accepted' ? 'App install started. After it finishes, open the app icon and enable alerts.' : 'Install was dismissed. You can still use Add to Home screen from Chrome.', choice.outcome === 'accepted' ? 'ok' : 'warn')
+      updateInstallCta()
+    }
+
+    async function invokeApprovalFunction(body) {
+      const supabase = ensureClient()
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) {
+        throw sessionError
+      }
+
+      const accessToken = sessionData.session?.access_token || ''
+      if (!accessToken) {
+        throw new Error('Sign in on this phone first, then turn on phone alerts.')
+      }
+
+      let response
+      try {
+        response = await fetch(supabaseUrl.replace(/\/$/, '') + '/functions/v1/approval-notify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: anonKey,
+            Authorization: 'Bearer ' + accessToken,
+          },
+          body: JSON.stringify(body),
+        })
+      } catch {
+        throw new Error('The phone alert service could not be reached. Refresh the page and try again.')
+      }
+
+      const responseText = await response.text()
+      let payload = {}
+      try {
+        payload = responseText ? JSON.parse(responseText) : {}
+      } catch {
+        payload = { error: responseText }
+      }
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'The phone alert service rejected the request.')
+      }
+
+      return payload
     }
 
     async function enablePhoneNotifications() {
@@ -398,28 +518,36 @@
           throw new Error('Push notifications are not available in this browser.')
         }
 
+        const user = await getTrustedUser().catch(() => null)
+        if (!user) {
+          throw new Error('Sign in on this phone first, then turn on phone alerts.')
+        }
+
+        if (Notification.permission === 'denied') {
+          throw new Error('Notifications are blocked for this site. Re-enable them in Chrome site settings and try again.')
+        }
+
+        setPhoneStatus('Requesting notification permission…', 'warn')
         const permission = await Notification.requestPermission()
         if (permission !== 'granted') {
           throw new Error('Notification permission was not granted.')
         }
 
+        setPhoneStatus('Saving this phone for alerts…', 'warn')
         const subscription = await swRegistration.pushManager.getSubscription() || await swRegistration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
         })
 
-        const supabase = ensureClient()
-        const { error } = await supabase.functions.invoke('approval-notify', {
-          body: {
-            action: 'subscribe',
-            subscription: subscription.toJSON(),
-          },
+        await invokeApprovalFunction({
+          action: 'subscribe',
+          subscription: subscription.toJSON(),
         })
 
-        if (error) throw error
         setPhoneStatus('Phone alerts are enabled. New approval requests can now ping this device.', 'ok')
       } catch (error) {
-        setPhoneStatus(formatAuthError(error), 'danger-text')
+        const message = formatAuthError(error)
+        setPhoneStatus(message, 'danger-text')
       }
     }
 
@@ -781,8 +909,10 @@
     document.getElementById('signOutBtn').addEventListener('click', signOut)
     document.getElementById('openAuthBtn').addEventListener('click', () => show(authCard, true))
     document.getElementById('closeAuthBtn').addEventListener('click', () => show(authCard, false))
-    document.getElementById('openPhoneBtn').addEventListener('click', () => show(document.getElementById('phoneModal'), true))
-    document.getElementById('closePhoneBtn').addEventListener('click', () => show(document.getElementById('phoneModal'), false))
+    document.getElementById('openPhoneBtn').addEventListener('click', () => show(phoneModal, true))
+    document.getElementById('closePhoneBtn').addEventListener('click', () => show(phoneModal, false))
+    heroInstallBtn.addEventListener('click', promptInstall)
+    heroPhoneBtn.addEventListener('click', () => show(phoneModal, true))
     document.getElementById('closeEnrollBtn').addEventListener('click', () => show(enrollCard, false))
     document.getElementById('closeMfaBtn').addEventListener('click', () => show(mfaCard, false))
     document.getElementById('closeApproveBtn').addEventListener('click', () => show(approveCard, false))
@@ -809,10 +939,12 @@
         window.addEventListener('beforeinstallprompt', (event) => {
           event.preventDefault()
           deferredInstallPrompt = event
+          updateInstallCta()
           setPhoneStatus('This app can now be installed on your phone.', 'ok')
         })
 
         ensureClient()
+        updateInstallCta()
         await registerPhoneApp()
         await restoreSessionFromUrlTokens()
         await updateUiState()

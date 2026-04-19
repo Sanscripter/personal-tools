@@ -19,6 +19,9 @@ $RECYCLE.BIN/
 # Environment-specific files
 .env
 .env.*
+setup/security/*.local.ps1
+setup/security/*.local.json
+supabase/
 
 # PowerShell and shell history
 *.ps1xml

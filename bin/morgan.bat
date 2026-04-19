@@ -1,5 +1,6 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
+set "MORGAN_CONTEXT=%~dp0..\scripts\system\morgan-context.ps1"
 
 if "%~1"=="" goto :help
 
@@ -35,6 +36,15 @@ if /i "%CMD%"=="help" goto :help
 if /i "%CMD%"=="say" goto :say
 if /i "%CMD%"=="speak" goto :say
 if /i "%CMD%"=="status" goto :status
+if /i "%CMD%"=="context" goto :context
+if /i "%CMD%"=="sites" goto :sites
+if /i "%CMD%"=="site" goto :site
+if /i "%CMD%"=="tabs" goto :tabs
+if /i "%CMD%"=="tab" goto :tab
+if /i "%CMD%"=="switch" goto :switch
+if /i "%CMD%"=="computers" goto :computers
+if /i "%CMD%"=="computer" goto :computer
+if /i "%CMD%"=="pc" goto :computer
 if /i "%CMD%"=="open" goto :open
 if /i "%CMD%"=="search" goto :search
 if /i "%CMD%"=="find" goto :search
@@ -100,6 +110,121 @@ echo.
 call "%~dp0steam.bat" status
 echo.
 call "%~dp0tools-setup.bat" status
+if exist "!MORGAN_CONTEXT!" (
+    echo.
+    powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action status
+)
+exit /b %errorlevel%
+
+:context
+shift
+if not exist "!MORGAN_CONTEXT!" (
+    echo Morgan context helper is missing.
+    exit /b 1
+)
+if "%~1"=="" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action status
+    exit /b %errorlevel%
+)
+if /i "%~1"=="init" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action init
+    exit /b %errorlevel%
+)
+if /i "%~1"=="edit" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action init >nul
+    start "" notepad.exe "%~dp0..\setup\security\morgan-context.local.json"
+    exit /b 0
+)
+if /i "%~1"=="sites" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action sites
+    exit /b %errorlevel%
+)
+if /i "%~1"=="computers" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action computers
+    exit /b %errorlevel%
+)
+if /i "%~1"=="tabs" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action tabs
+    exit /b %errorlevel%
+)
+powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action status
+exit /b %errorlevel%
+
+:sites
+shift
+if not exist "!MORGAN_CONTEXT!" (
+    echo Morgan context helper is missing.
+    exit /b 1
+)
+powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action sites
+exit /b %errorlevel%
+
+:site
+shift
+if "%~1"=="" (
+    goto :sites
+)
+call :tryOpenContextTarget %1 %2 %3 %4 %5 %6 %7 %8 %9
+if "%CONTEXT_OPENED%"=="1" exit /b 0
+echo No saved site matched that name yet.
+exit /b 1
+
+:tabs
+shift
+if not exist "!MORGAN_CONTEXT!" (
+    echo Morgan context helper is missing.
+    exit /b 1
+)
+powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action tabs
+exit /b %errorlevel%
+
+:tab
+shift
+if not exist "!MORGAN_CONTEXT!" (
+    echo Morgan context helper is missing.
+    exit /b 1
+)
+if "%~1"=="" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action tabs
+) else (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action focus-tab %*
+)
+exit /b %errorlevel%
+
+:switch
+shift
+if "%~1"=="" (
+    echo Use: morgan switch ^<tab title^|computer name^>
+    exit /b 1
+)
+powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action focus-tab %* >nul 2>nul
+if not errorlevel 1 (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action focus-tab %*
+    exit /b %errorlevel%
+)
+powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action computer %1 open
+exit /b %errorlevel%
+
+:computers
+shift
+if not exist "!MORGAN_CONTEXT!" (
+    echo Morgan context helper is missing.
+    exit /b 1
+)
+powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action computers
+exit /b %errorlevel%
+
+:computer
+shift
+if not exist "!MORGAN_CONTEXT!" (
+    echo Morgan context helper is missing.
+    exit /b 1
+)
+if "%~1"=="" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action computers
+) else (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action computer %*
+)
 exit /b %errorlevel%
 
 :open
@@ -132,6 +257,8 @@ if /i "%~1"=="steam" (
     call "%~dp0steam.bat" open
     exit /b %errorlevel%
 )
+call :tryOpenContextTarget %1 %2 %3 %4 %5 %6 %7 %8 %9
+if "%CONTEXT_OPENED%"=="1" exit /b 0
 call :isLikelyUrl "%~1"
 if "%IS_URL%"=="1" (
     call "%~dp0chrome.bat" open %1 %2 %3 %4 %5 %6 %7 %8 %9
@@ -375,6 +502,15 @@ if "%~1"=="" (
 )
 exit /b %errorlevel%
 
+:tryOpenContextTarget
+set "CONTEXT_OPENED=0"
+if not exist "!MORGAN_CONTEXT!" exit /b 0
+for /f "usebackq delims=" %%I in (`powershell -NoProfile -ExecutionPolicy Bypass -File "!MORGAN_CONTEXT!" -Action resolve-site %1 %2 %3 %4 %5 %6 %7 %8 %9 2^>nul`) do (
+    set "CONTEXT_OPENED=1"
+    call "%~dp0chrome.bat" open "%%~I"
+)
+exit /b 0
+
 :isLikelyUrl
 set "IS_URL=0"
 set "TARGET=%~1"
@@ -394,7 +530,15 @@ echo   morgan media next
 echo   morgan youtube search coding music
 echo   morgan open spotify
 echo   morgan open https://www.google.com
+echo   morgan open work
 echo   morgan search best mechanical keyboard switches
+echo   morgan context
+echo   morgan context edit
+echo   morgan sites
+echo   morgan tabs
+echo   morgan tab github
+echo   morgan computers
+echo   morgan computer office-pc open
 echo   morgan setup status
 echo   morgan disk
 echo   morgan net
@@ -407,4 +551,5 @@ echo.
 echo You can also say:
 echo   hey morgan play lo fi beats
 echo   morgan music status
+echo   morgan switch github
 exit /b 0

@@ -6,6 +6,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$script:SetupUtilsPath = Join-Path $PSScriptRoot '..\..\setup\core\setup-utils.ps1'
+if (Test-Path $script:SetupUtilsPath) {
+    . $script:SetupUtilsPath
+}
+
 $script:KnownProfiles = @(
     [pscustomobject]@{
         MenuKey      = '1'
@@ -63,6 +68,14 @@ function Request-ElevatedInstall {
     param([Parameter(Mandatory = $true)]$Candidate)
 
     if (Test-IsAdministrator) {
+        return
+    }
+
+    if (Get-Command Ensure-ElevatedSession -ErrorAction SilentlyContinue) {
+        $shouldContinue = Ensure-ElevatedSession -ScriptPath $PSCommandPath -ScriptArguments @('set', $Candidate.Tag) -Reason ('Windows may need Administrator access to download the language pack for ' + $Candidate.Label + '.')
+        if (-not $shouldContinue) {
+            exit 0
+        }
         return
     }
 

@@ -65,6 +65,8 @@ After that, the commands are available from any folder in new terminals. If you 
 
 Morgan is a lightweight command router for this toolbox. It is intentionally small and composes with your existing scripts instead of replacing them.
 
+It now also supports a private local context file for your frequent sites, browser tabs, and known computers so you can jump around more naturally.
+
 Typical use:
 
 ```bat
@@ -73,7 +75,17 @@ morgan play daft punk
 morgan search best mechanical keyboard switches
 morgan setup status
 morgan say Toolbox ready
+morgan context
+morgan context edit
+morgan sites
+morgan open work
+morgan tabs
+morgan tab github
+morgan computers
+morgan computer office-pc open
 ```
+
+Personal context lives in `setup\security\morgan-context.local.json`. The example template is in `setup\security\morgan-context.local.example.json`, and the local file is ignored by git so you can safely store your own machine names and shortcuts there.
 
 ## Spotify setup
 
@@ -144,6 +156,8 @@ diag taskmgr
 morgan disk
 morgan ram
 ```
+
+The RAM view also lists the top 5 processes using the most memory right now.
 
 ## WhatsApp helper
 

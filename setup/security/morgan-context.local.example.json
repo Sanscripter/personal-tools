@@ -1,0 +1,34 @@
+{
+  "sites": {
+    "github": "https://github.com/",
+    "gmail": "https://mail.google.com/",
+    "calendar": "https://calendar.google.com/",
+    "work": [
+      "https://github.com/",
+      "https://mail.google.com/",
+      "https://calendar.google.com/"
+    ],
+    "learning": {
+      "urls": [
+        "https://www.youtube.com/",
+        "https://developer.mozilla.org/"
+      ]
+    }
+  },
+  "computers": {
+    "this-pc": {
+      "host": "REPLACE-WITH-YOUR-PC-NAME",
+      "notes": "Main machine"
+    },
+    "office-pc": {
+      "host": "192.168.1.50",
+      "rdp": "192.168.1.50",
+      "notes": "Remote Windows desktop"
+    },
+    "linux-box": {
+      "host": "192.168.1.60",
+      "ssh": "me@192.168.1.60",
+      "notes": "Home server"
+    }
+  }
+}

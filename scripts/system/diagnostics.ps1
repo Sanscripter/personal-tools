@@ -115,6 +115,20 @@ function Show-RamInfo {
     Write-Output ("Used         : {0} ({1}%)" -f (Format-Size $used), $usedPercent)
     Write-Output ("Free         : {0}" -f (Format-Size $free))
     Write-Output ("Total        : {0}" -f (Format-Size $total))
+    Write-Output ''
+    Write-Output 'Top 5 offenders'
+    Write-Output '---------------'
+
+    $topProcesses = Get-Process -ErrorAction SilentlyContinue |
+        Sort-Object WorkingSet64 -Descending |
+        Select-Object -First 5 @{Name='Name';Expression={$_.ProcessName}}, @{Name='PID';Expression={$_.Id}}, @{Name='RAM';Expression={Format-Size $_.WorkingSet64}}
+
+    if ($topProcesses) {
+        ($topProcesses | Format-Table -AutoSize | Out-String -Width 140).TrimEnd()
+    }
+    else {
+        Write-Output 'Could not read process memory usage.'
+    }
 }
 
 function Open-TaskManager {
@@ -136,7 +150,7 @@ function Show-Help {
     Write-Output 'What it does:'
     Write-Output '  - shows free space for the current drive'
     Write-Output '  - prints the local IPv4 and MAC address'
-    Write-Output '  - shows current RAM usage'
+    Write-Output '  - shows current RAM usage and the top 5 memory offenders'
     Write-Output '  - opens Windows Task Manager quickly'
 }
 

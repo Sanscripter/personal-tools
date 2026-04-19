@@ -48,15 +48,34 @@ if /i "%CMD%"=="previous" goto :previous
 if /i "%CMD%"=="prev" goto :previous
 if /i "%CMD%"=="shuffle" goto :shuffle
 if /i "%CMD%"=="music" goto :music
+if /i "%CMD%"=="media" goto :media
 if /i "%CMD%"=="spotify" goto :spotify
+if /i "%CMD%"=="steam" goto :steam
+if /i "%CMD%"=="game" goto :games
+if /i "%CMD%"=="games" goto :games
 if /i "%CMD%"=="chrome" goto :chrome
 if /i "%CMD%"=="browser" goto :chrome
+if /i "%CMD%"=="youtube" goto :youtube
+if /i "%CMD%"=="video" goto :youtube
 if /i "%CMD%"=="whatsapp" goto :whatsapp
 if /i "%CMD%"=="chat" goto :chat
 if /i "%CMD%"=="message" goto :message
 if /i "%CMD%"=="text" goto :message
 if /i "%CMD%"=="setup" goto :setup
 if /i "%CMD%"=="install" goto :install
+if /i "%CMD%"=="diag" goto :diag
+if /i "%CMD%"=="diagnostics" goto :diag
+if /i "%CMD%"=="disk" goto :disk
+if /i "%CMD%"=="space" goto :disk
+if /i "%CMD%"=="ram" goto :ram
+if /i "%CMD%"=="memory" goto :ram
+if /i "%CMD%"=="net" goto :net
+if /i "%CMD%"=="network" goto :net
+if /i "%CMD%"=="ip" goto :net
+if /i "%CMD%"=="mac" goto :net
+if /i "%CMD%"=="taskmgr" goto :taskmgr
+if /i "%CMD%"=="tasks" goto :taskmgr
+if /i "%CMD%"=="processes" goto :taskmgr
 if /i "%CMD%"=="github" goto :github
 if /i "%CMD%"=="repo" goto :github
 
@@ -76,7 +95,9 @@ exit /b %errorlevel%
 :status
 echo Morgan status
 echo -------------
-call "%~dp0spotify.bat" status
+call "%~dp0media.bat" status
+echo.
+call "%~dp0steam.bat" status
 echo.
 call "%~dp0tools-setup.bat" status
 exit /b %errorlevel%
@@ -99,8 +120,16 @@ if /i "%~1"=="browser" (
     call "%~dp0chrome.bat" open
     exit /b %errorlevel%
 )
+if /i "%~1"=="youtube" (
+    call "%~dp0youtube.bat" open
+    exit /b %errorlevel%
+)
 if /i "%~1"=="whatsapp" (
     call "%~dp0whatsapp.bat" open
+    exit /b %errorlevel%
+)
+if /i "%~1"=="steam" (
+    call "%~dp0steam.bat" open
     exit /b %errorlevel%
 )
 call :isLikelyUrl "%~1"
@@ -141,26 +170,26 @@ exit /b %errorlevel%
 :play
 shift
 if "%~1"=="" (
-    call "%~dp0spotify.bat" play
+    call "%~dp0media.bat" play
 ) else (
     call "%~dp0spotify.bat" search %*
 )
 exit /b %errorlevel%
 
 :pause
-call "%~dp0spotify.bat" pause
+call "%~dp0media.bat" pause
 exit /b %errorlevel%
 
 :toggle
-call "%~dp0spotify.bat" toggle
+call "%~dp0media.bat" toggle
 exit /b %errorlevel%
 
 :next
-call "%~dp0spotify.bat" next
+call "%~dp0media.bat" next
 exit /b %errorlevel%
 
 :previous
-call "%~dp0spotify.bat" previous
+call "%~dp0media.bat" previous
 exit /b %errorlevel%
 
 :shuffle
@@ -177,33 +206,42 @@ if "%~1"=="" (
 if /i "%~1"=="play" (
     shift
     if "%~1"=="" (
-        call "%~dp0spotify.bat" play
+        call "%~dp0media.bat" play
     ) else (
         call "%~dp0spotify.bat" search %*
     )
     exit /b %errorlevel%
 )
 if /i "%~1"=="pause" (
-    call "%~dp0spotify.bat" pause
+    call "%~dp0media.bat" pause
     exit /b %errorlevel%
 )
 if /i "%~1"=="next" (
-    call "%~dp0spotify.bat" next
+    call "%~dp0media.bat" next
     exit /b %errorlevel%
 )
 if /i "%~1"=="previous" (
-    call "%~dp0spotify.bat" previous
+    call "%~dp0media.bat" previous
     exit /b %errorlevel%
 )
 if /i "%~1"=="prev" (
-    call "%~dp0spotify.bat" previous
+    call "%~dp0media.bat" previous
     exit /b %errorlevel%
 )
 if /i "%~1"=="status" (
-    call "%~dp0spotify.bat" status
+    call "%~dp0media.bat" status
     exit /b %errorlevel%
 )
 call "%~dp0spotify.bat" search %*
+exit /b %errorlevel%
+
+:media
+shift
+if "%~1"=="" (
+    call "%~dp0media.bat" help
+) else (
+    call "%~dp0media.bat" %*
+)
 exit /b %errorlevel%
 
 :spotify
@@ -215,12 +253,39 @@ if "%~1"=="" (
 )
 exit /b %errorlevel%
 
+:steam
+shift
+if "%~1"=="" (
+    call "%~dp0steam.bat" help
+) else (
+    call "%~dp0steam.bat" %1 %2 %3 %4 %5 %6 %7 %8 %9
+)
+exit /b %errorlevel%
+
+:games
+shift
+if "%~1"=="" (
+    call "%~dp0steam.bat" list
+) else (
+    call "%~dp0steam.bat" search %1 %2 %3 %4 %5 %6 %7 %8 %9
+)
+exit /b %errorlevel%
+
 :chrome
 shift
 if "%~1"=="" (
     call "%~dp0chrome.bat" help
 ) else (
     call "%~dp0chrome.bat" %*
+)
+exit /b %errorlevel%
+
+:youtube
+shift
+if "%~1"=="" (
+    call "%~dp0youtube.bat" help
+) else (
+    call "%~dp0youtube.bat" %*
 )
 exit /b %errorlevel%
 
@@ -276,6 +341,31 @@ if not defined TARGET (
 )
 exit /b %errorlevel%
 
+:diag
+shift
+if "%~1"=="" (
+    call "%~dp0diag.bat" all
+) else (
+    call "%~dp0diag.bat" %*
+)
+exit /b %errorlevel%
+
+:disk
+call "%~dp0diag.bat" disk
+exit /b %errorlevel%
+
+:ram
+call "%~dp0diag.bat" ram
+exit /b %errorlevel%
+
+:net
+call "%~dp0diag.bat" net
+exit /b %errorlevel%
+
+:taskmgr
+call "%~dp0diag.bat" taskmgr
+exit /b %errorlevel%
+
 :github
 shift
 if "%~1"=="" (
@@ -300,10 +390,16 @@ echo.
 echo Simple examples:
 echo   morgan play daft punk
 echo   morgan pause
+echo   morgan media next
+echo   morgan youtube search coding music
 echo   morgan open spotify
 echo   morgan open https://www.google.com
 echo   morgan search best mechanical keyboard switches
 echo   morgan setup status
+echo   morgan disk
+echo   morgan net
+echo   morgan ram
+echo   morgan taskmgr
 echo   morgan install podman
 echo   morgan github init
 echo   morgan say Hello there

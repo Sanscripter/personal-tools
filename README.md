@@ -19,15 +19,23 @@ A small collection of Windows batch utilities for everyday local development tas
 - `addPath` — adds this toolset to your user `PATH`.
 - `reload` — reloads the Cmder shell environment.
 - `say` — speaks text aloud using the built-in Windows speech synthesizer, including installed voices for other languages.
+- `media` — sends global play, pause, next, and previous commands to the current Windows media session, so browser and app playback can be controlled the same way.
+- `screen` — records the current screen to an MP4 file with audio or silent options when FFmpeg is available.
+- `screenshot` — opens the built-in Windows screenshot tool and screenshot folder shortcuts.
 - `spotify` — opens Spotify, searches music, controls playback, and now includes a built-in setup flow for new machines.
+- `steam` — opens Steam, lists your installed games in the terminal, searches your library, and launches a game by name or app id.
+- `youtube` — opens YouTube in Chrome, searches videos, jumps to watch or playlist links, and reuses the same global media controls.
 - `keyboard` — switches Windows input language quickly, with Portuguese and English International as the first two quick options.
+- `diag` — shows quick local diagnostics for disk space, local IPv4 and MAC details, RAM usage, and a Task Manager shortcut.
 - `chrome` — launches Google Chrome and installs it automatically if it is not already available.
 - `morgan` — a tiny plain-English toolbox helper that routes simple requests to your existing commands.
 - `admin` — opens a new Administrator shell in the current folder after a loud visual warning and an optional audio prompt.
 - `google` — safely URL-encodes multilingual search text and opens the first Google result in Chrome.
 - `whatsapp` — opens local WhatsApp, searches chats, and can draft or send messages through simple commands.
-- `tools-setup` — a master setup catalog for bootstrapping common developer tools.
+- `tools-setup` — a master setup catalog for bootstrapping common developer tools, now including Python and Cmder.
 - `install-vscode` — installs Visual Studio Code and makes the `code` launcher available.
+- `install-cmder` — installs Cmder and prepares the `reload` helper environment.
+- `install-python` — installs Python and makes `python` and `pip` available.
 - `install-nvm-node` — installs NVM for Windows, the latest Node.js, and the latest npm.
 - `install-angular-cli` — installs Angular CLI globally and confirms the installed version.
 - `install-podman` — installs Podman as an open-source Docker-compatible alternative.
@@ -41,6 +49,7 @@ Some scripts depend on tools already being installed:
 - [GitHub CLI](https://cli.github.com/) for `github` and `github2`
 - Cmder for `reload`
 - PowerShell with `System.Speech` available for `say`
+- FFmpeg for `screen` recording, with `screen setup` available as a quick installer shortcut
 
 ## Setup
 
@@ -78,6 +87,8 @@ spotify status
 spotify play
 spotify random
 spotify next
+media pause
+media next
 ```
 
 ## Keyboard language helper
@@ -118,6 +129,22 @@ Admin review for this repo:
 - likely needed for `install-nvm-node`, `install-podman`, `install-godot`, and some `chrome install` paths
 - usually not needed for `addPath`, `google`, `spotify`, `say`, `github`, `reload`, or `install-angular-cli`
 
+## Diagnostics helper
+
+Use the diagnostics helper for quick local machine checks without hunting through Windows menus.
+
+Typical use:
+
+```bat
+diag
+diag disk
+diag net
+diag ram
+diag taskmgr
+morgan disk
+morgan ram
+```
+
 ## WhatsApp helper
 
 Use the WhatsApp launcher to open the desktop app, jump straight into chat search, or type a draft without touching the mouse.
@@ -134,6 +161,70 @@ whatsapp send -- I am on my way
 whatsapp draft Project Team -- Meeting moved to 3pm
 whatsapp send Alice -- I am on my way
 whatsapp phone +5511999999999 -- Hello from Windows
+```
+## Steam helper
+
+Use the Steam launcher to open the client, browse your installed library in the terminal, search by name, and start a game quickly.
+
+Typical use:
+
+```bat
+steam open
+steam status
+steam list
+steam browse
+steam search portal
+steam play Hades
+steam play 14
+steam play "Mount & Blade: Warband"
+steam run 620
+morgan games
+morgan steam open
+```
+## YouTube helper
+
+Use YouTube through Chrome and keep the same keyboard-friendly workflow for browser playback.
+
+Typical use:
+
+```bat
+youtube open
+youtube search lo fi coding music
+youtube watch https://www.youtube.com/watch?v=dQw4w9WgXcQ
+youtube pause
+youtube next
+```
+
+## Screen recorder
+
+Use the screen helper for quick desktop captures with either audio or silent video-only mode.
+
+Typical use:
+
+```bat
+screen audio
+screen silent
+screen silent demo.mp4 -seconds 10
+screen audio meeting.mp4
+screen openfolder
+screen setup
+```
+
+Notes:
+- recordings are saved to your Windows Videos\ScreenRecordings folder by default
+- press `q` or `Ctrl+C` to stop a live recording
+- audio mode tries the default Windows audio device and falls back to silent recording if that input is not available
+
+## Screenshot helper
+
+Use the screenshot helper to open the built-in Windows snipping UI quickly from the terminal.
+
+Typical use:
+
+```bat
+screenshot
+screenshot snip
+screenshot openfolder
 ```
 
 ## Examples
@@ -153,12 +244,27 @@ say -lang pt-BR Olá do Windows
 say -lang "French" Bonjour tout le monde
 say -voice "Microsoft Zira Desktop" Hello again
 spotify search daft punk
+steam list
+steam search half-life
+steam play Portal 2
+media toggle
+youtube search synthwave live
+youtube pause
+screen audio
+screen silent quick-demo.mp4 -seconds 5
+screenshot
+screenshot openfolder
 keyboard 1
 keyboard english international
 google café near shibuya
 google results 東京 ラーメン
 chrome google best mechanical keyboard switches
 chrome open https://www.google.com
+diag
+diag disk
+diag net
+diag ram
+diag taskmgr
 whatsapp search family
 whatsapp send Alice -- On my way
 tools-setup

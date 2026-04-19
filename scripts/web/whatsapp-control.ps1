@@ -180,6 +180,18 @@ function Send-TextByClipboard {
     }
 }
 
+function Reset-WhatsAppUi {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object] $Shell
+    )
+
+    foreach ($key in @('{ESC}', '{ESC}', '{ESC}')) {
+        $Shell.SendKeys($key)
+        Start-Sleep -Milliseconds 120
+    }
+}
+
 function Open-ChatDialog {
     param(
         [Parameter(Mandatory = $true)]
@@ -190,13 +202,18 @@ function Open-ChatDialog {
 
     Start-WhatsApp
     $shell = Set-WhatsAppWindowFocus
+    Reset-WhatsAppUi -Shell $shell
 
-    $shell.SendKeys('^n')
-    Start-Sleep -Milliseconds 500
+    $shell.SendKeys('^%/')
+    Start-Sleep -Milliseconds 450
+    $shell.SendKeys('^a')
+    Start-Sleep -Milliseconds 120
     Send-TextByClipboard -Shell $shell -Text $Query
 
     if ($OpenChat) {
         Start-Sleep -Milliseconds 700
+        $shell.SendKeys('{DOWN}')
+        Start-Sleep -Milliseconds 150
         $shell.SendKeys('{ENTER}')
         Start-Sleep -Milliseconds 450
     }
@@ -206,10 +223,12 @@ function Open-ChatDialog {
 
 function Get-ReadyWhatsAppShell {
     Start-WhatsApp
-    return Set-WhatsAppWindowFocus
+    $shell = Set-WhatsAppWindowFocus
+    Reset-WhatsAppUi -Shell $shell
+    return $shell
 }
 
-function Normalize-OutgoingMessage {
+function Convert-OutgoingMessage {
     param(
         [AllowEmptyString()]
         [string] $Text
@@ -299,7 +318,7 @@ if ($rawInput -match '^(?i)(chat|openchat)\s+(.+)$') {
 
     if ($parts.Count -ge 2) {
         $target = $parts[0].Trim()
-        $message = Normalize-OutgoingMessage -Text $parts[1]
+        $message = Convert-OutgoingMessage -Text $parts[1]
         $shell = Open-ChatDialog -Query $target -OpenChat
         Send-TextByClipboard -Shell $shell -Text $message
         exit 0
@@ -314,7 +333,7 @@ if ($rawInput -match '^(?i)(draft|message|send)\s+(.+)$') {
     $rest = $Matches[2].Trim()
 
     if ($rest -match '^--\s*(.+)$') {
-        $message = Normalize-OutgoingMessage -Text $Matches[1]
+        $message = Convert-OutgoingMessage -Text $Matches[1]
         $shell = Get-ReadyWhatsAppShell
         Send-TextByClipboard -Shell $shell -Text $message
 
@@ -334,7 +353,7 @@ if ($rawInput -match '^(?i)(draft|message|send)\s+(.+)$') {
     }
 
     $target = $parts[0].Trim()
-    $message = Normalize-OutgoingMessage -Text $parts[1]
+    $message = Convert-OutgoingMessage -Text $parts[1]
     $shell = Open-ChatDialog -Query $target -OpenChat
     Send-TextByClipboard -Shell $shell -Text $message
 

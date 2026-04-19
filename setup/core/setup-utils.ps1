@@ -24,7 +24,33 @@ function Add-PathIfExists {
     }
 }
 
+function Refresh-WindowsToolingPath {
+    Add-PathIfExists (Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps')
+    Add-PathIfExists (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links')
+}
+
+function Get-WingetPath {
+    $command = Get-Command winget.exe -ErrorAction SilentlyContinue
+    if ($command -and $command.Source) {
+        return $command.Source
+    }
+
+    $candidates = @(
+        (Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\winget.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links\winget.exe')
+    ) | Where-Object { $_ -and (-not [string]::IsNullOrWhiteSpace($_)) }
+
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
 function Refresh-NodeToolingPath {
+    Refresh-WindowsToolingPath
     Add-PathIfExists $env:NVM_HOME
     Add-PathIfExists $env:NVM_SYMLINK
     Add-PathIfExists (Join-Path $env:ProgramFiles 'nvm')
@@ -86,8 +112,14 @@ function Ensure-ElevatedSession {
 }
 
 function Ensure-PackageManager {
-    if (Test-Command 'winget') {
-        return 'winget'
+    Refresh-WindowsToolingPath
+
+    $wingetPath = Get-WingetPath
+    if ($wingetPath) {
+        Add-PathIfExists (Split-Path -Parent $wingetPath)
+        if (Test-Command 'winget') {
+            return 'winget'
+        }
     }
 
     if (Test-Command 'choco') {

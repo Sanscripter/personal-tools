@@ -10,6 +10,9 @@ if /i "%ACTION%"=="status" goto :status
 if /i "%ACTION%"=="all" goto :all
 if /i "%ACTION%"=="spotify" goto :spotify
 if /i "%ACTION%"=="vscode" goto :vscode
+if /i "%ACTION%"=="cmder" goto :cmder
+if /i "%ACTION%"=="commander" goto :cmder
+if /i "%ACTION%"=="python" goto :python
 if /i "%ACTION%"=="nvm-node" goto :nvmnode
 if /i "%ACTION%"=="node" goto :nvmnode
 if /i "%ACTION%"=="angular" goto :angular
@@ -25,26 +28,32 @@ goto :catalog
 echo Tools setup catalog
 echo.
 echo Available items:
-echo   spotify   - Install or verify Spotify for the command-line media helper
-echo   keyboard  - Set up quick switching for Portuguese and English International
-echo   vscode    - Install Visual Studio Code and the code command-line launcher
-echo   nvm-node  - Install NVM for Windows, latest Node.js, and npm
-echo   angular   - Install Angular CLI and confirm its version
-echo   podman    - Install Podman as the open-source Docker-compatible alternative
-echo   godot     - Install Godot Engine
-echo   all       - Run the full setup sequence
-echo   status    - Show currently detected versions
+echo   spotify    - Install or verify Spotify for the command-line media helper
+echo   keyboard   - Set up quick switching for Portuguese and English International
+echo   vscode     - Install Visual Studio Code and the code command-line launcher
+echo   cmder      - Install Cmder and prepare the reload helper ^(alias: commander^)
+echo   python     - Install Python and make python/pip available on PATH
+echo   nvm-node   - Install NVM for Windows, latest Node.js, and npm
+echo   angular    - Install Angular CLI and confirm its version
+echo   podman     - Install Podman as the open-source Docker-compatible alternative
+echo   godot      - Install Godot Engine
+echo   all        - Run the full setup sequence
+echo   status     - Show currently detected versions
 echo.
 echo Recommended order:
 echo   1. tools-setup keyboard
 echo   2. tools-setup spotify
 echo   3. tools-setup vscode
-echo   4. tools-setup nvm-node
-echo   5. tools-setup angular
-echo   6. tools-setup podman
-echo   7. tools-setup godot
+echo   4. tools-setup cmder
+echo   5. tools-setup python
+echo   6. tools-setup nvm-node
+echo   7. tools-setup angular
+echo   8. tools-setup podman
+echo   9. tools-setup godot
 echo.
 echo Examples:
+echo   tools-setup python
+echo   tools-setup commander
 echo   tools-setup vscode
 echo   tools-setup all
 echo   tools-setup status
@@ -59,6 +68,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installers\install-key
 if errorlevel 1 exit /b 1
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installers\install-vscode.ps1" -Status
 if errorlevel 1 exit /b 1
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installers\install-cmder.ps1" -Status
+if errorlevel 1 exit /b 1
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installers\install-python.ps1" -Status
+if errorlevel 1 exit /b 1
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installers\install-nvm-node.ps1" -Status
 if errorlevel 1 exit /b 1
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installers\install-angular-cli.ps1" -Status
@@ -69,9 +82,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installers\install-god
 exit /b %errorlevel%
 
 :all
+call :keyboard
+if errorlevel 1 exit /b 1
 call :spotify
 if errorlevel 1 exit /b 1
 call :vscode
+if errorlevel 1 exit /b 1
+call :cmder
+if errorlevel 1 exit /b 1
+call :python
 if errorlevel 1 exit /b 1
 call :nvmnode
 if errorlevel 1 exit /b 1
@@ -95,6 +114,14 @@ exit /b %errorlevel%
 
 :keyboard
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installers\install-keyboard-language.ps1"
+exit /b %errorlevel%
+
+:cmder
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installers\install-cmder.ps1"
+exit /b %errorlevel%
+
+:python
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installers\install-python.ps1"
 exit /b %errorlevel%
 
 :nvmnode

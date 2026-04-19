@@ -37,6 +37,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path public | Out-Null
           Copy-Item 'setup/security/approval-page.html' 'public/index.html' -Force
+          Copy-Item 'setup/security/approval-qr.html' 'public/approval-qr.html' -Force
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

@@ -135,6 +135,18 @@ function Get-ApprovalPageUrl {
     return ([System.Uri]::new($localPagePath)).AbsoluteUri
 }
 
+function Get-ApprovalQrPageUrl {
+    $approvalPageUrl = Get-ApprovalPageUrl
+    if (-not [string]::IsNullOrWhiteSpace($approvalPageUrl) -and -not $approvalPageUrl.StartsWith('file:', [System.StringComparison]::OrdinalIgnoreCase)) {
+        $baseUri = [System.Uri]::new($approvalPageUrl)
+        return ([System.Uri]::new($baseUri, 'approval-qr.html')).AbsoluteUri
+    }
+
+    $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+    $qrPagePath = Join-Path $repoRoot 'setup\security\approval-qr.html'
+    return ([System.Uri]::new($qrPagePath)).AbsoluteUri
+}
+
 function New-ApprovalSecret {
     $bytes = New-Object byte[] 32
     $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
@@ -268,24 +280,39 @@ function Request-PrivilegedApproval {
 
     $approvalPageUrl = Get-ApprovalPageUrl
     $queryString = ConvertTo-QueryString @{
-        request     = $requestId
-        secret      = $requestSecret
-        supabaseUrl = $supabaseUrl
-        anonKey     = $anonKey
+        request = $requestId
+        secret  = $requestSecret
     }
     $launchUrl = $approvalPageUrl + $(if ($approvalPageUrl.Contains('?')) { '&' } else { '?' }) + $queryString
+
+    $qrPageUrl = Get-ApprovalQrPageUrl
+    $qrDisplayUrl = $qrPageUrl + '?' + (ConvertTo-QueryString @{
+        request = $requestId
+        secret  = $requestSecret
+        page    = $approvalPageUrl
+        action  = $Action
+    })
 
     Write-Host ''
     Write-Host 'Approval request created.' -ForegroundColor Green
     Write-Host ("Action: {0}" -f $Action) -ForegroundColor Cyan
     Write-Host ("Approver: {0}" -f $normalizedApprover) -ForegroundColor Cyan
-    Write-Host 'Check your phone and approve the request in the browser page.' -ForegroundColor Yellow
+    Write-Host 'Scan the QR page with your phone or use the copied link to approve.' -ForegroundColor Yellow
+    Write-Host ("Phone approval link: {0}" -f $launchUrl) -ForegroundColor DarkCyan
 
     try {
-        Start-Process -FilePath $launchUrl | Out-Null
+        Set-Clipboard -Value $launchUrl -ErrorAction Stop
+        Write-Host 'The phone approval link was copied to the clipboard.' -ForegroundColor Green
     }
     catch {
-        Write-Host 'The approval page could not be opened automatically. Open your configured approval URL manually.' -ForegroundColor Yellow
+        Write-Host 'Clipboard copy is not available in this host.' -ForegroundColor DarkYellow
+    }
+
+    try {
+        Start-Process -FilePath $qrDisplayUrl | Out-Null
+    }
+    catch {
+        Write-Host 'The QR handoff page could not be opened automatically. Open the copied link on your phone manually.' -ForegroundColor Yellow
     }
 
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSec)

@@ -81,6 +81,252 @@ function Invoke-OptionalAudioWarning {
     }
 }
 
+$script:PersonalToolsApprovalSettingsLoaded = $false
+
+function Import-ApprovalSettings {
+    if ($script:PersonalToolsApprovalSettingsLoaded) {
+        return
+    }
+
+    $script:PersonalToolsApprovalSettingsLoaded = $true
+    $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+    $localSettingsPath = Join-Path $repoRoot 'setup\security\approval.local.ps1'
+
+    if (Test-Path $localSettingsPath) {
+        . $localSettingsPath
+    }
+}
+
+function Get-ApprovalMode {
+    Import-ApprovalSettings
+
+    $mode = [string]$env:PERSONAL_TOOLS_APPROVAL_MODE
+    if ([string]::IsNullOrWhiteSpace($mode)) {
+        return 'off'
+    }
+
+    return $mode.Trim().ToLowerInvariant()
+}
+
+function Get-ApprovalTimeoutSeconds {
+    Import-ApprovalSettings
+
+    $defaultTimeout = 120
+    $raw = [string]$env:PERSONAL_TOOLS_APPROVAL_TIMEOUT_SEC
+    $parsed = 0
+
+    if ([int]::TryParse($raw, [ref]$parsed) -and $parsed -ge 30) {
+        return $parsed
+    }
+
+    return $defaultTimeout
+}
+
+function Get-ApprovalPageUrl {
+    Import-ApprovalSettings
+
+    $configuredUrl = [string]$env:PERSONAL_TOOLS_APPROVAL_PAGE_URL
+    if (-not [string]::IsNullOrWhiteSpace($configuredUrl)) {
+        return $configuredUrl.Trim()
+    }
+
+    $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+    $localPagePath = Join-Path $repoRoot 'setup\security\approval-page.html'
+    return ([System.Uri]::new($localPagePath)).AbsoluteUri
+}
+
+function New-ApprovalSecret {
+    $bytes = New-Object byte[] 32
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+
+    try {
+        $rng.GetBytes($bytes)
+    }
+    finally {
+        if ($null -ne $rng) {
+            $rng.Dispose()
+        }
+    }
+
+    $secret = [Convert]::ToBase64String($bytes).TrimEnd('=')
+    return ($secret -replace '\+', '-' -replace '/', '_')
+}
+
+function ConvertTo-QueryString {
+    param([hashtable]$Parameters)
+
+    if ($null -eq $Parameters -or $Parameters.Count -eq 0) {
+        return ''
+    }
+
+    return (($Parameters.GetEnumerator() |
+        Where-Object { $null -ne $_.Value -and -not [string]::IsNullOrWhiteSpace([string]$_.Value) } |
+        ForEach-Object {
+            '{0}={1}' -f [System.Uri]::EscapeDataString([string]$_.Key), [System.Uri]::EscapeDataString([string]$_.Value)
+        }) -join '&')
+}
+
+function Invoke-ApprovalApiRequest {
+    param(
+        [Parameter(Mandatory = $true)][string]$SupabaseUrl,
+        [Parameter(Mandatory = $true)][string]$AnonKey,
+        [Parameter(Mandatory = $true)][ValidateSet('Get', 'Post', 'Patch')][string]$Method,
+        [string]$RelativePath = '',
+        [hashtable]$ExtraHeaders,
+        [object]$Body
+    )
+
+    $headers = @{
+        apikey        = $AnonKey
+        Authorization = "Bearer $AnonKey"
+        Accept        = 'application/json'
+    }
+
+    if ($ExtraHeaders) {
+        foreach ($key in $ExtraHeaders.Keys) {
+            $headers[$key] = $ExtraHeaders[$key]
+        }
+    }
+
+    $invokeParams = @{
+        Method      = $Method
+        Uri         = ($SupabaseUrl.TrimEnd('/') + '/rest/v1/admin_approval_requests' + $RelativePath)
+        Headers     = $headers
+        ErrorAction = 'Stop'
+    }
+
+    if ($null -ne $Body) {
+        $invokeParams['ContentType'] = 'application/json'
+        $invokeParams['Body'] = ($Body | ConvertTo-Json -Depth 10 -Compress)
+    }
+
+    return Invoke-RestMethod @invokeParams
+}
+
+function Request-PrivilegedApproval {
+    param(
+        [Parameter(Mandatory = $true)][string]$Action,
+        [string]$Reason = 'Administrator privileges are being requested from the personal-tools repo.',
+        [int]$TimeoutSec = 0
+    )
+
+    $mode = Get-ApprovalMode
+    if ($mode -in @('off', 'disabled', 'false', '0', 'no')) {
+        return $true
+    }
+
+    Import-ApprovalSettings
+
+    $supabaseUrl = [string]$env:PERSONAL_TOOLS_SUPABASE_URL
+    $anonKey = [string]$env:PERSONAL_TOOLS_SUPABASE_ANON_KEY
+    $approverEmail = [string]$env:PERSONAL_TOOLS_APPROVER_EMAIL
+
+    if ($TimeoutSec -le 0) {
+        $TimeoutSec = Get-ApprovalTimeoutSeconds
+    }
+
+    if ([string]::IsNullOrWhiteSpace($supabaseUrl) -or
+        [string]::IsNullOrWhiteSpace($anonKey) -or
+        [string]::IsNullOrWhiteSpace($approverEmail)) {
+        $message = 'Approval is enabled but the Supabase settings are incomplete. Update setup\security\approval.local.ps1 first.'
+        if ($mode -eq 'required') {
+            Write-Host $message -ForegroundColor Red
+            return $false
+        }
+
+        Write-Host $message -ForegroundColor Yellow
+        return $true
+    }
+
+    $requestId = [guid]::NewGuid().Guid
+    $requestSecret = New-ApprovalSecret
+    $expiresAt = [DateTime]::UtcNow.AddSeconds([Math]::Max($TimeoutSec, 30)).ToString('o')
+    $normalizedApprover = $approverEmail.Trim().ToLowerInvariant()
+
+    $body = [ordered]@{
+        request_id       = $requestId
+        request_secret   = $requestSecret
+        action           = $Action
+        reason           = $Reason
+        requester_host   = $env:COMPUTERNAME
+        requester_user   = [Environment]::UserName
+        allowed_email    = $normalizedApprover
+        expires_at       = $expiresAt
+    }
+
+    try {
+        $null = Invoke-ApprovalApiRequest -SupabaseUrl $supabaseUrl -AnonKey $anonKey -Method Post -ExtraHeaders @{
+            Prefer             = 'return=representation'
+            'X-Approval-Secret' = $requestSecret
+        } -Body $body
+    }
+    catch {
+        Write-Host ('Could not create the approval request: ' + $_.Exception.Message) -ForegroundColor Red
+        return $false
+    }
+
+    $approvalPageUrl = Get-ApprovalPageUrl
+    $queryString = ConvertTo-QueryString @{
+        request     = $requestId
+        secret      = $requestSecret
+        supabaseUrl = $supabaseUrl
+        anonKey     = $anonKey
+    }
+    $launchUrl = $approvalPageUrl + $(if ($approvalPageUrl.Contains('?')) { '&' } else { '?' }) + $queryString
+
+    Write-Host ''
+    Write-Host 'Approval request created.' -ForegroundColor Green
+    Write-Host ("Action: {0}" -f $Action) -ForegroundColor Cyan
+    Write-Host ("Approver: {0}" -f $normalizedApprover) -ForegroundColor Cyan
+    Write-Host 'Check your phone and approve the request in the browser page.' -ForegroundColor Yellow
+
+    try {
+        Start-Process -FilePath $launchUrl | Out-Null
+    }
+    catch {
+        Write-Host 'The approval page could not be opened automatically. Open your configured approval URL manually.' -ForegroundColor Yellow
+    }
+
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSec)
+    while ([DateTime]::UtcNow -lt $deadline) {
+        Start-Sleep -Seconds 2
+
+        try {
+            $requestIdFilter = [System.Uri]::EscapeDataString("eq.$requestId")
+            $selectFields = [System.Uri]::EscapeDataString('request_id,status,approved_by_email,expires_at')
+            $response = Invoke-ApprovalApiRequest -SupabaseUrl $supabaseUrl -AnonKey $anonKey -Method Get -RelativePath "?request_id=$requestIdFilter&select=$selectFields&limit=1" -ExtraHeaders @{
+                'X-Approval-Secret' = $requestSecret
+            }
+
+            $requestState = @($response) | Select-Object -First 1
+            if ($null -eq $requestState) {
+                continue
+            }
+
+            switch ([string]$requestState.status) {
+                'approved' {
+                    Write-Host 'Approval granted.' -ForegroundColor Green
+                    return $true
+                }
+                'denied' {
+                    Write-Host 'Approval was denied.' -ForegroundColor Yellow
+                    return $false
+                }
+                'expired' {
+                    Write-Host 'Approval request expired.' -ForegroundColor Yellow
+                    return $false
+                }
+            }
+        }
+        catch {
+            continue
+        }
+    }
+
+    Write-Host 'Approval timed out.' -ForegroundColor Yellow
+    return $false
+}
+
 function Ensure-ElevatedSession {
     param(
         [Parameter(Mandatory = $true)][string]$ScriptPath,
@@ -104,6 +350,11 @@ function Ensure-ElevatedSession {
     $confirm = Read-Host 'Open a new elevated PowerShell window now? [y/N]'
     if ($confirm -notmatch '^(y|yes)$') {
         Write-Host 'Cancelled. No elevated window was opened.' -ForegroundColor Yellow
+        return $false
+    }
+
+    if (-not (Request-PrivilegedApproval -Action 'administrator session' -Reason $Reason)) {
+        Write-Host 'Approval was not granted, so the elevated window was not opened.' -ForegroundColor Yellow
         return $false
     }
 

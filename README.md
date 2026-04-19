@@ -30,9 +30,11 @@ A small collection of Windows batch utilities for everyday local development tas
 - `chrome` — launches Google Chrome and installs it automatically if it is not already available.
 - `morgan` — a tiny plain-English toolbox helper that routes simple requests to your existing commands.
 - `admin` — opens a new Administrator shell in the current folder after a loud visual warning and an optional audio prompt.
+- `otp` — triggers the same short-lived approval challenge manually before a risky action.
 - `google` — safely URL-encodes multilingual search text and opens the first Google result in Chrome.
 - `whatsapp` — opens local WhatsApp, searches chats, and can draft or send messages through simple commands.
-- `tools-setup` — a master setup catalog for bootstrapping common developer tools, now including Python and Cmder.
+- `supabase` — runs the Supabase CLI locally and can bootstrap it on a new machine.
+- `tools-setup` — a master setup catalog for bootstrapping common developer tools, now including Python, Cmder, and Supabase.
 - `install-vscode` — installs Visual Studio Code and makes the `code` launcher available.
 - `install-cmder` — installs Cmder and prepares the `reload` helper environment.
 - `install-python` — installs Python and makes `python` and `pip` available.
@@ -64,8 +66,7 @@ After that, the commands are available from any folder in new terminals. If you 
 ## Morgan helper
 
 Morgan is a lightweight command router for this toolbox. It is intentionally small and composes with your existing scripts instead of replacing them.
-
-It now also supports a private local context file for your frequent sites, browser tabs, and known computers so you can jump around more naturally.
+It also supports a private local context file for your frequent sites, browser tabs, and known computers so you can jump around more naturally.
 
 Typical use:
 
@@ -76,13 +77,10 @@ morgan search best mechanical keyboard switches
 morgan setup status
 morgan say Toolbox ready
 morgan context
-morgan context edit
 morgan sites
 morgan open work
 morgan tabs
-morgan tab github
 morgan computers
-morgan computer office-pc open
 ```
 
 Personal context lives in `setup\security\morgan-context.local.json`. The example template is in `setup\security\morgan-context.local.example.json`, and the local file is ignored by git so you can safely store your own machine names and shortcuts there.
@@ -140,6 +138,20 @@ chrome install
 Admin review for this repo:
 - likely needed for `install-nvm-node`, `install-podman`, `install-godot`, and some `chrome install` paths
 - usually not needed for `addPath`, `google`, `spotify`, `say`, `github`, `reload`, or `install-angular-cli`
+
+Manual OTP check:
+
+```bat
+otp
+otp install podman
+```
+
+Security model for approval:
+- machines do **not** share a TOTP seed with each other
+- each privileged request creates a short-lived approval record in Supabase
+- approval happens from your trusted approver account plus MFA, typically on your phone
+- for strict work/personal separation, use separate approver accounts or separate Supabase projects
+- a dedicated `otp` helper can trigger the same approval challenge before you run something risky
 
 ## Diagnostics helper
 

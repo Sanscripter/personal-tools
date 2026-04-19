@@ -16,6 +16,7 @@ if /i "%ACTION%"=="python" goto :python
 if /i "%ACTION%"=="nvm-node" goto :nvmnode
 if /i "%ACTION%"=="node" goto :nvmnode
 if /i "%ACTION%"=="angular" goto :angular
+if /i "%ACTION%"=="supabase" goto :supabase
 if /i "%ACTION%"=="podman" goto :podman
 if /i "%ACTION%"=="godot" goto :godot
 if /i "%ACTION%"=="keyboard" goto :keyboard
@@ -35,6 +36,7 @@ echo   cmder      - Install Cmder and prepare the reload helper ^(alias: command
 echo   python     - Install Python and make python/pip available on PATH
 echo   nvm-node   - Install NVM for Windows, latest Node.js, and npm
 echo   angular    - Install Angular CLI and confirm its version
+echo   supabase   - Install the Supabase CLI for local dev and project workflows
 echo   podman     - Install Podman as the open-source Docker-compatible alternative
 echo   godot      - Install Godot Engine
 echo   all        - Run the full setup sequence
@@ -48,8 +50,9 @@ echo   4. tools-setup cmder
 echo   5. tools-setup python
 echo   6. tools-setup nvm-node
 echo   7. tools-setup angular
-echo   8. tools-setup podman
-echo   9. tools-setup godot
+echo   8. tools-setup supabase
+echo   9. tools-setup podman
+echo  10. tools-setup godot
 echo.
 echo Examples:
 echo   tools-setup python
@@ -76,6 +79,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installers\install-nvm
 if errorlevel 1 exit /b 1
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installers\install-angular-cli.ps1" -Status
 if errorlevel 1 exit /b 1
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installers\install-supabase.ps1" -Status
+if errorlevel 1 exit /b 1
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installers\install-podman.ps1" -Status
 if errorlevel 1 exit /b 1
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installers\install-godot.ps1" -Status
@@ -95,6 +100,8 @@ if errorlevel 1 exit /b 1
 call :nvmnode
 if errorlevel 1 exit /b 1
 call :angular
+if errorlevel 1 exit /b 1
+call :supabase
 if errorlevel 1 exit /b 1
 call :podman
 if errorlevel 1 exit /b 1
@@ -130,6 +137,10 @@ exit /b %errorlevel%
 
 :angular
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installers\install-angular-cli.ps1"
+exit /b %errorlevel%
+
+:supabase
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0installers\install-supabase.ps1"
 exit /b %errorlevel%
 
 :podman

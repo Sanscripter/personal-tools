@@ -6,21 +6,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-function Invoke-OptionalAudioWarning {
-    $audioChoice = Read-Host 'Play an audible warning before requesting Administrator mode? [y/N]'
-    if ($audioChoice -notmatch '^(y|yes)$') {
-        return
-    }
-
-    try {
-        [console]::Beep(1200, 150)
-        Start-Sleep -Milliseconds 100
-        [console]::Beep(900, 250)
-    }
-    catch {
-        Write-Host 'Audio warning is not available in this host.' -ForegroundColor DarkYellow
-    }
-}
+. (Join-Path $PSScriptRoot 'setup-utils.ps1')
 
 $currentPath = (Get-Location).Path
 Write-Host ''
@@ -42,6 +28,11 @@ Invoke-OptionalAudioWarning
 $confirm = Read-Host 'Open the elevated shell now? [y/N]'
 if ($confirm -notmatch '^(y|yes)$') {
     Write-Host 'Cancelled. No elevated shell was opened.' -ForegroundColor Yellow
+    exit 1
+}
+
+if (-not (Request-PrivilegedApproval -Action 'administrator shell' -Reason 'A new elevated shell is being opened from the personal-tools repo.')) {
+    Write-Host 'Approval was not granted, so the shell was not opened.' -ForegroundColor Yellow
     exit 1
 }
 

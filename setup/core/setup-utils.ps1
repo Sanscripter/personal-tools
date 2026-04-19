@@ -338,30 +338,37 @@ function Request-PrivilegedApproval {
     }
 
     Write-Host ''
-    Write-Host 'Approval request created.' -ForegroundColor Green
-    Write-Host ("Action: {0}" -f $Action) -ForegroundColor Cyan
-    Write-Host ("Approver: {0}" -f $normalizedApprover) -ForegroundColor Cyan
+    Write-Host '========================================' -ForegroundColor DarkCyan
+    Write-Host ' Morgan Toolbox approval request ready ' -ForegroundColor Green
+    Write-Host '========================================' -ForegroundColor DarkCyan
+    Write-Host ("Action   : {0}" -f $Action) -ForegroundColor Cyan
+    Write-Host ("Approver : {0}" -f $normalizedApprover) -ForegroundColor Cyan
+    Write-Host ''
+
     if ($phoneAlertSent) {
-        Write-Host 'Your phone should receive the Morgan Toolbox approval notification now. The QR page is a backup path.' -ForegroundColor Yellow
+        Write-Host '[OK] If your PWA is installed, check notifications on your phone now.' -ForegroundColor Green
+        Write-Host '     The QR handoff page is only a backup option.' -ForegroundColor Yellow
     }
     else {
-        Write-Host 'Scan the QR page with your phone or use the copied link to approve.' -ForegroundColor Yellow
+        Write-Host '• No linked phone app was detected yet.' -ForegroundColor Yellow
+        Write-Host '  If your PWA is installed, check your phone anyway after enabling alerts once.' -ForegroundColor Yellow
     }
-    Write-Host ("Phone approval link: {0}" -f $launchUrl) -ForegroundColor DarkCyan
+
+    Write-Host ''
+    Write-Host 'Click or copy this approval link:' -ForegroundColor White
+    Write-Host $launchUrl -ForegroundColor DarkCyan
+    Write-Host ''
+    Write-Host 'Optional QR fallback page:' -ForegroundColor White
+    Write-Host $qrDisplayUrl -ForegroundColor DarkCyan
 
     try {
         Set-Clipboard -Value $launchUrl -ErrorAction Stop
-        Write-Host 'The phone approval link was copied to the clipboard.' -ForegroundColor Green
+        Write-Host ''
+        Write-Host 'The approval link was copied to the clipboard.' -ForegroundColor Green
     }
     catch {
+        Write-Host ''
         Write-Host 'Clipboard copy is not available in this host.' -ForegroundColor DarkYellow
-    }
-
-    try {
-        Start-Process -FilePath $qrDisplayUrl | Out-Null
-    }
-    catch {
-        Write-Host 'The QR handoff page could not be opened automatically. Open the copied link on your phone manually.' -ForegroundColor Yellow
     }
 
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSec)

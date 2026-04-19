@@ -322,21 +322,31 @@ function Request-PrivilegedApproval {
         action  = $Action
     })
 
+    $phoneAlertSent = $false
     try {
         $notifyResult = Invoke-ApprovalNotification -SupabaseUrl $supabaseUrl -AnonKey $anonKey -RequestId $requestId -RequestSecret $requestSecret -ApprovalUrl $launchUrl -Action $Action
         if ($notifyResult.ok -and [int]$notifyResult.sent -gt 0) {
-            Write-Host 'A phone alert was sent to your linked Android app.' -ForegroundColor Green
+            $phoneAlertSent = $true
+            Write-Host 'A Morgan Toolbox phone alert was sent to your linked Android app.' -ForegroundColor Green
+        }
+        else {
+            Write-Host 'No linked Morgan Toolbox phone app was available yet, so the QR page remains the backup path.' -ForegroundColor DarkYellow
         }
     }
     catch {
-        Write-Host 'No phone alert was sent yet. The QR page and copied link still work.' -ForegroundColor DarkYellow
+        Write-Host 'No linked phone alert was sent yet. The QR page and copied link still work.' -ForegroundColor DarkYellow
     }
 
     Write-Host ''
     Write-Host 'Approval request created.' -ForegroundColor Green
     Write-Host ("Action: {0}" -f $Action) -ForegroundColor Cyan
     Write-Host ("Approver: {0}" -f $normalizedApprover) -ForegroundColor Cyan
-    Write-Host 'Scan the QR page with your phone or use the copied link to approve.' -ForegroundColor Yellow
+    if ($phoneAlertSent) {
+        Write-Host 'Your phone should receive the Morgan Toolbox approval notification now. The QR page is a backup path.' -ForegroundColor Yellow
+    }
+    else {
+        Write-Host 'Scan the QR page with your phone or use the copied link to approve.' -ForegroundColor Yellow
+    }
     Write-Host ("Phone approval link: {0}" -f $launchUrl) -ForegroundColor DarkCyan
 
     try {

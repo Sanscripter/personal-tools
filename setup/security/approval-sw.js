@@ -8,7 +8,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('push', (event) => {
   let payload = {
-    title: 'Approval request',
+    title: 'Morgan Toolbox approval needed',
     body: 'A privileged action needs your approval.',
     url: '/morgan-toolbox/',
   }

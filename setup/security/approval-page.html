@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0b1220" />
-  <title>Privileged Approval</title>
+  <title>Morgan Toolbox approval</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <style>
     :root {
@@ -74,6 +74,17 @@
     .modal-actions { margin-top: 12px; }
     .quick-actions { display: flex; gap: 10px; flex-wrap: wrap; }
     .quick-actions button { flex: 1 1 180px; }
+    .warning-banner {
+      background: linear-gradient(180deg, #3a1111, #2a0d0d);
+      border: 1px solid #7a2a2a;
+      color: #ffd6d6;
+      font-weight: 800;
+      letter-spacing: .02em;
+    }
+    .warning-banner p {
+      color: #ffd6d6;
+      margin: 0;
+    }
     .install-hero {
       border-color: #4669a8;
       box-shadow: 0 0 0 1px rgba(110, 168, 254, 0.2), 0 16px 40px rgba(0,0,0,.25);
@@ -143,21 +154,25 @@
 </head>
 <body>
   <div class="wrap">
+    <div class="card warning-banner">
+      <p>WARNING THIS IS AN UNSTABLE DEVELOPMENT TOOL. DON'T SHARE PASSWORDS WITH OTHER SERVICES!</p>
+    </div>
+
     <div class="card">
-      <h1>Privileged command approval</h1>
-      <p>This page is used by the local admin helpers to approve or deny elevated actions.</p>
+      <h1>Morgan Toolbox privileged approval</h1>
+      <p>This Morgan Toolbox page is used by the local admin helpers to approve or deny elevated actions.</p>
       <div id="status" class="mono">Loading…</div>
     </div>
 
     <div class="card install-hero" id="installHero">
       <div class="install-chip">Recommended on Android</div>
       <h2>Install this on your phone</h2>
-      <p>Add it to your home screen once, then turn on phone alerts for faster approvals.</p>
+      <p>Add the Morgan Toolbox approval app to your home screen once, then turn on phone alerts for faster approvals.</p>
       <div class="quick-actions">
         <button id="heroInstallBtn" type="button">Install on this phone</button>
         <button id="heroPhoneBtn" type="button" class="secondary">Set up phone alerts</button>
       </div>
-      <p id="installHint" class="hint">Best flow: sign in on Android, install the app, then enable alerts.</p>
+      <p id="installHint" class="hint">Best flow: sign in on Android, install the app, then enable alerts. After that, phone push is primary and the QR is only backup.</p>
     </div>
 
     <div class="card" id="requestCard">
@@ -273,7 +288,7 @@
           <h3 id="phoneTitle">Phone app</h3>
           <button id="closePhoneBtn" type="button" class="secondary">Close</button>
         </div>
-        <p><strong>Best on Android:</strong> install this page once and allow alerts so new approval requests can jump straight to your phone.</p>
+        <p><strong>Best on Android:</strong> install this Morgan Toolbox page once and allow alerts so new approval requests can jump straight to your phone.</p>
         <ol class="install-steps">
           <li>Sign in on this phone</li>
           <li>Tap <strong>Install on this phone</strong></li>
@@ -346,6 +361,7 @@
     let supabaseClient = null
     let swRegistration = null
     let deferredInstallPrompt = null
+    let phoneAlertsSynced = false
     let currentRequest = null
     let currentFactorId = null
     let enrollFactorId = null
@@ -512,39 +528,81 @@
       return payload
     }
 
-    async function enablePhoneNotifications() {
-      try {
-        if (!swRegistration || !('PushManager' in window)) {
+    async function syncPhoneNotifications(silent = false) {
+      if (!swRegistration || !('PushManager' in window)) {
+        if (!silent) {
           throw new Error('Push notifications are not available in this browser.')
         }
+        return false
+      }
 
-        const user = await getTrustedUser().catch(() => null)
-        if (!user) {
+      const user = await getTrustedUser().catch(() => null)
+      if (!user) {
+        if (!silent) {
           throw new Error('Sign in on this phone first, then turn on phone alerts.')
         }
+        return false
+      }
 
-        if (Notification.permission === 'denied') {
+      if (Notification.permission === 'denied') {
+        if (!silent) {
           throw new Error('Notifications are blocked for this site. Re-enable them in Chrome site settings and try again.')
         }
+        return false
+      }
 
+      if (!silent) {
         setPhoneStatus('Requesting notification permission…', 'warn')
-        const permission = await Notification.requestPermission()
-        if (permission !== 'granted') {
+      }
+      const permission = Notification.permission === 'granted'
+        ? 'granted'
+        : await Notification.requestPermission()
+
+      if (permission !== 'granted') {
+        if (!silent) {
           throw new Error('Notification permission was not granted.')
         }
+        return false
+      }
 
+      if (!silent) {
         setPhoneStatus('Saving this phone for alerts…', 'warn')
-        const subscription = await swRegistration.pushManager.getSubscription() || await swRegistration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-        })
+      }
 
-        await invokeApprovalFunction({
-          action: 'subscribe',
-          subscription: subscription.toJSON(),
-        })
+      const subscription = await swRegistration.pushManager.getSubscription() || await swRegistration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      })
 
-        setPhoneStatus('Phone alerts are enabled. New approval requests can now ping this device.', 'ok')
+      await invokeApprovalFunction({
+        action: 'subscribe',
+        subscription: subscription.toJSON(),
+      })
+
+      phoneAlertsSynced = true
+      return true
+    }
+
+    async function ensurePhoneNotificationsLinked() {
+      if (phoneAlertsSynced || Notification.permission !== 'granted') {
+        return
+      }
+
+      try {
+        const linked = await syncPhoneNotifications(true)
+        if (linked) {
+          setPhoneStatus('This phone is linked for Morgan Toolbox approval alerts. New requests should notify this device automatically.', 'ok')
+        }
+      } catch {
+      }
+    }
+
+    async function enablePhoneNotifications() {
+      try {
+        const linked = await syncPhoneNotifications(false)
+        if (linked) {
+          setPhoneStatus('Phone alerts are enabled. New Morgan Toolbox approval requests can now ping this device automatically while the QR remains as backup.', 'ok')
+        }
       } catch (error) {
         const message = formatAuthError(error)
         setPhoneStatus(message, 'danger-text')
@@ -674,7 +732,7 @@
         show(signOutBtn, !!user)
 
         if (!user) {
-          setStatus('Sign in to continue.', 'warn')
+          setStatus('Sign in to continue with Morgan Toolbox approval.', 'warn')
           show(authCard, true)
           show(enrollCard, false)
           show(mfaCard, false)
@@ -684,13 +742,14 @@
         }
 
         show(authCard, false)
+        await ensurePhoneNotificationsLinked()
 
         const factorsResponse = await supabase.auth.mfa.listFactors()
         if (factorsResponse.error) throw factorsResponse.error
         const totpFactors = (factorsResponse.data?.totp || []).filter((factor) => factor.status === 'verified')
 
         if (totpFactors.length === 0) {
-          setStatus('Signed in as ' + user.email + '. Enroll MFA to finish approval setup.', 'warn')
+          setStatus('Signed in as ' + user.email + '. Enroll MFA to finish Morgan Toolbox approval setup.', 'warn')
           show(enrollCard, true)
           show(mfaCard, false)
           show(approveCard, false)
@@ -701,7 +760,7 @@
         currentFactorId = totpFactors[0].id
 
         if (!currentRequest || currentRequest.status !== 'pending') {
-          setStatus('Signed in as ' + user.email + '. Waiting for an approval request.', 'ok')
+          setStatus('Signed in as ' + user.email + '. Waiting for a Morgan Toolbox approval request.', 'ok')
           show(enrollCard, false)
           show(mfaCard, false)
           show(approveCard, false)
@@ -730,8 +789,8 @@
           setStatus('Enter the current authenticator code to continue.', 'warn')
         }
         else {
-          approveSummary.textContent = 'Approve the request for ' + currentRequest.action + '.'
-          setStatus('Signed in as ' + user.email + '. Ready to decide this request.', 'ok')
+          approveSummary.textContent = 'Approve the Morgan Toolbox request for ' + currentRequest.action + '.'
+          setStatus('Signed in as ' + user.email + '. Ready to decide this Morgan Toolbox request.', 'ok')
         }
       } catch (error) {
         setStatus(formatAuthError(error), 'danger-text')
@@ -948,6 +1007,7 @@
         await registerPhoneApp()
         await restoreSessionFromUrlTokens()
         await updateUiState()
+        await ensurePhoneNotificationsLinked()
       } catch (error) {
         setStatus(formatAuthError(error), 'danger-text')
       }

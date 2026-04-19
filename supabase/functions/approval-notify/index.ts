@@ -236,7 +236,7 @@ Deno.serve(async (request) => {
       for (const entry of subscriptions ?? []) {
         try {
           await webpush.sendNotification(entry.subscription, JSON.stringify({
-            title: 'Approval needed',
+            title: 'Morgan Toolbox approval needed',
             body: approvalAction || approvalRequest.action || 'A privileged action needs your approval.',
             url: approvalUrl,
             tag: requestId,
